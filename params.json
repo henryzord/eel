@@ -1,0 +1,5 @@
+{
+  "train_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_train.arff",
+  "val_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_val.arff",
+  "test_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_test.arff"
+}

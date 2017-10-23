@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+.idea/
+generation_population.csv
+eda/generation_population.csv
+
 # C extensions
 *.so
 
