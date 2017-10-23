@@ -30,33 +30,33 @@ def load_population(base_classifier, population, X_train, y_train, X_val, y_val)
     n_classifiers, n_attributes = population.shape
 
     ensemble = np.empty(n_classifiers, dtype=np.object)
-    hit_or_miss = np.empty((n_classifiers, X_val.shape[0]), dtype=np.bool)
+    predictions = np.empty((n_classifiers, X_val.shape[0]), dtype=np.int32)
 
     for j in xrange(n_classifiers):  # number of base classifiers
         selected_features = X_features[population[j]]
-        ensemble[j], hit_or_miss[j] = __get_classifier__(
+        ensemble[j], predictions[j] = __get_classifier__(
             base_classifier, selected_features,
-            X_train, y_train, X_val, y_val
+            X_train, y_train, X_val
         )
         if j % 50 == 0:
             print 'Loaded %d classifiers' % j
 
-    return ensemble, population, hit_or_miss
+    return ensemble, population, predictions
 
 
-def __get_classifier__(clf, selected_features, X_train, y_train, X_val, y_val):
+def __get_classifier__(clf, selected_features, X_train, y_train, X_val):
     model = clf(random_state=0)
+
+    classes = np.unique(y_train)
 
     try:
         model = model.fit(X_train[selected_features], y_train)
         preds = model.predict(X_val[selected_features])
 
-        hit_or_miss = y_val == preds
-
     except ValueError:  # train set is empty
-        hit_or_miss = np.zeros(y_val.shape[0])
+        preds = np.random.choice(classes, replace=True, size=X_train.shape[0])
 
-    return model, hit_or_miss
+    return model, preds
 
 
 def a_dominates_b(a, b):

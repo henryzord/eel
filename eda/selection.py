@@ -1,31 +1,25 @@
 import json
-import warnings
-from collections import Counter
 
 import numpy as np
 import pandas as pd
 from sklearn.tree import DecisionTreeClassifier as clf
 
+from core import check_distribution
 from eda.core import load_population
 from eda.dataset import load_sets
-import itertools as it
-from core import check_distribution
 
 
-def select(ensemble, population, hit_or_miss, X_val, y_val):
-    # print 'WARNING: selecting all ensemble members!\n'
-    # selected = np.ones(len(ensemble), dtype=np.bool)
-
-    accs = np.sum(hit_or_miss, axis=1) / float(hit_or_miss.shape[1])
+def select(ensemble, population, predictions, X_val, y_val):
+    accs = np.sum(predictions, axis=1) / float(predictions.shape[1])
 
     median = np.median(accs)
-    warnings.warn('warning: using whole population')
+    # # warnings.warn('warning: using whole population')
     to_select = np.ones(len(population), dtype=np.bool)
     # to_select = accs > median
 
     best_ensemble = ensemble[to_select]
     best_population = population[to_select]
-    best_hit_or_miss = hit_or_miss[to_select]
+    best_hit_or_miss = predictions[to_select]
 
     check_distribution(best_ensemble, best_population, X_val, y_val)
 

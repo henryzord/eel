@@ -19,23 +19,35 @@ def __check_accuracy__(weights, models, features, X_test, y_test):
 
     X_features = X_test.columns
 
-    test_hit_or_miss = np.empty((n_classifiers, n_test_instances), dtype=np.bool)
+    predictions = np.empty((n_classifiers, n_test_instances), dtype=np.int32)
 
     for j in xrange(n_classifiers):
         pred = models[j].predict(X_test[X_features[features[j]]])
-        test_hit_or_miss[j] = y_test == pred
+        predictions[j] = y_test == pred
 
-    y_test_pred = __ensemble_predict__(weights, test_hit_or_miss.T)
+    y_test_pred = __ensemble_predict__(weights, predictions)
     test_accuracy = accuracy_score(y_test, y_test_pred)
     return test_accuracy
 
 
-def __ensemble_predict__(individual, hit_or_miss):
+def __ensemble_predict__(voting_weights, predictions):
+    # TODO wrong! how can it predict if it doesn't know the class??
 
-    pred_matrix = np.dot(hit_or_miss, individual)
-    y_pred = np.argmax(pred_matrix, axis=1)
+    n_classifiers, n_classes = voting_weights.shape
+    n_classifiers, n_instances = predictions.shape
 
-    return y_pred
+    local_votes = np.empty(n_classes, dtype=np.float32)
+    global_votes = np.empty(n_instances, dtype=np.int32)
+
+    for i in xrange(n_instances):
+        local_votes[:] = 0.
+
+        for j in xrange(n_classifiers):
+            local_votes[predictions[j, i]] += voting_weights[j, predictions[j, i]]
+
+        global_votes[i] = np.argmax(local_votes)
+
+    return global_votes
 
 
 # -------------------------------------------------------------------------------------- #
@@ -43,12 +55,11 @@ def __ensemble_predict__(individual, hit_or_miss):
 # -------------------------------------------------------------------------------------- #
 
 
-def integrate(hit_or_miss, y_val, n_individuals=100, n_generations=100, models=None, features=None, X_test=None, y_test=None):
+def integrate(predictions, y_val, n_individuals=100, n_generations=100, models=None, features=None, X_test=None, y_test=None):
     classes = np.unique(y_val)
     n_classes = len(classes)
 
-    hit_or_miss = hit_or_miss.T
-    n_instances, n_classifiers = hit_or_miss.shape
+    n_classifiers, n_instances = predictions.shape
 
     population = np.empty((n_individuals, n_classifiers, n_classes), dtype=np.float32)
     fitness = np.empty(n_individuals, dtype=np.float32)
@@ -70,7 +81,7 @@ def integrate(hit_or_miss, y_val, n_individuals=100, n_generations=100, models=N
 
             population[i] = np.clip(population[i], a_min=0, a_max=1)
 
-            y_pred = __ensemble_predict__(population[i], hit_or_miss)
+            y_pred = __ensemble_predict__(population[i], predictions)
             fitness[i] = accuracy_score(y_val, y_pred)
 
         # update
@@ -114,14 +125,14 @@ def main():
     print 'loading population...'
     _population = pd.read_csv('generation_population.csv', sep=',').values
 
-    _ensemble, _population, hit_or_miss = load_population(clf, _population, X_train, y_train, X_val, y_val)
+    _ensemble, _population, predictions = load_population(clf, _population, X_train, y_train, X_val, y_val)
 
-    _best_classifiers, _best_features, _best_hit_or_miss = select(_ensemble, _population, hit_or_miss, X_val, y_val)
+    _best_classifiers, _best_features, _best_predictions = select(_ensemble, _population, predictions, X_val, y_val)
 
     # _best_accs = np.sum(_best_hit_or_miss, axis=1) / float(_best_hit_or_miss.shape[1])
 
     _best_weights = integrate(
-        _best_hit_or_miss, y_val,
+        _best_predictions, y_val,
         n_individuals=100, n_generations=100,
         models=_best_classifiers,
         features=_best_features,

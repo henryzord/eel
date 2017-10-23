@@ -3,6 +3,7 @@ import json
 import numpy as np
 import pandas as pd
 from bitarray import bitarray
+from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
 
 from eda.core import get_fronts, __get_classifier__
@@ -10,6 +11,7 @@ from eda.dataset import load_sets
 from datetime import datetime as dt
 from multiprocessing import Process
 from core import check_distribution
+from integration import __ensemble_predict__
 
 '''
 Check
@@ -28,7 +30,7 @@ def __save_population__(population):
     pd.DataFrame(dense).to_csv('generation_population.csv', sep=',', index=False)
 
 
-def get_fitness(ensemble, fitness, hit_or_miss, n_instances_val):
+def get_fitness(ensemble, fitness, predictions, y_val):
     """
 
     First objective is accuracy. Second objective is double-fault.
@@ -40,16 +42,36 @@ def get_fitness(ensemble, fitness, hit_or_miss, n_instances_val):
     """
     n_classifiers = len(ensemble)
 
+    n_instances_val = y_val.shape[0]
+
     pairwise_double_fault = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
 
     for i in xrange(n_classifiers):
-        fitness[i, 0] = np.sum(hit_or_miss[i, :]) / float(n_instances_val)
+        fitness[i, 0] = accuracy_score(y_val, predictions[i, :])
 
         for j in xrange(i, n_classifiers):
-            hits = np.sum(np.logical_xor(hit_or_miss[i], hit_or_miss[j]))
+            # TODO check!
+            index = np.sum(np.logical_xor(
+                predictions[i] == y_val,
+                predictions[j] == y_val
+            )) / float(n_instances_val)
 
-            pairwise_double_fault[i, j] = hits / float(n_instances_val)
-            pairwise_double_fault[j, i] = hits / float(n_instances_val)
+            # _a = hit_or_miss[i] & hit_or_miss[j]
+            # _b = hit_or_miss[i] & np.logical_not(hit_or_miss[j])
+            # _c = np.logical_not(_b)
+            # _d = np.logical_not(_a)
+            #
+            # a = np.sum(_a)
+            # b = np.sum(_b)
+            # c = np.sum(_c)
+            # d = np.sum(_d)
+            #
+            # # correlation coefficient p
+            # index = (a * d - b * c) / ((a + b) * (c + d) * (a + c) + (b + d)) ** (1./2.)
+            # index *= -1  # inverts index so bigger values are better
+
+            pairwise_double_fault[i, j] = index
+            pairwise_double_fault[j, i] = index
 
         fitness[i, 1] = np.mean(pairwise_double_fault[i, :])
 
@@ -73,10 +95,14 @@ def __replace_population__(population, fitness, p, medians):
     return p
 
 
-def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100, n_generations=100, save_at=10):
+def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100, n_generations=100, save_every=5):
     X_features = X_train.columns
     n_features = len(X_features)
     n_objectives = 2  # accuracy and diversity
+
+    n_classes = len(np.unique(y_val))
+
+    dummy_weights = np.ones((n_classifiers, n_classes), dtype=np.float32)
 
     n_instances_val = X_val.shape[0]
 
@@ -87,7 +113,7 @@ def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100,
 
     # first column for accuracy, second for scalar double fault
     fitness = np.empty((n_classifiers, n_objectives), dtype=np.float32)
-    hit_or_miss = np.empty((n_classifiers, n_instances_val), dtype=np.bool)
+    predictions = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
 
     # population
     population = [bitarray(n_features) for i in xrange(n_classifiers)]
@@ -100,11 +126,14 @@ def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100,
                 population[j][k] = np.random.choice(a=[0, 1], p=[1. - p[k], p[k]])
 
             selected_features = X_features[list(population[j])]
-            ensemble[j], hit_or_miss[j] = __get_classifier__(
-                base_classifier, selected_features, X_train, y_train, X_val, y_val
+            ensemble[j], predictions[j] = __get_classifier__(
+                base_classifier, selected_features, X_train, y_train, X_val
             )
 
-        fitness = get_fitness(ensemble, fitness, hit_or_miss, n_instances_val)
+        ensemble_preds = __ensemble_predict__(dummy_weights, predictions)
+        ensemble_acc = accuracy_score(y_val, ensemble_preds)
+
+        fitness = get_fitness(ensemble, fitness, predictions, y_val)
         medians = np.median(fitness, axis=0)
         means = np.mean(fitness, axis=0)
 
@@ -112,14 +141,14 @@ def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100,
 
         t2 = dt.now()
 
-        if g % save_at == 0:
+        if g % save_every == 0:
             Process(
                 target=__save_population__,
                 kwargs=dict(population=population)
             ).start()
 
-        print 'generation %d: median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
-            g, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
+        print 'generation %d: ens acc: %.2f median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
+            g, ensemble_acc, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
         )
         t1 = t2
 
@@ -144,7 +173,7 @@ def main():
         X_train, y_train, X_val, y_val,
         base_classifier=clf,
         n_classifiers=200,
-        n_generations=10
+        n_generations=15
     )
 
     check_distribution(ensemble, population, X_test, y_test)
