@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 
 import numpy as np
 import pandas as pd
@@ -28,6 +29,35 @@ def __save_population__(population):
     dense = np.array(map(lambda x: x.tolist(), population))
 
     pd.DataFrame(dense).to_csv('generation_population.csv', sep=',', index=False)
+
+
+def distinct_failure_diversity(predictions, y_true):
+    """
+    Imlements distinct failure diversity. See
+        Derek Partridge & Wo jtek Krzanowski. Distinct Failure Diversity in Multiversion Software. 1997
+        for more information.
+
+    :param predictions:
+    :param y_true:
+    :return:
+    """
+    n_classifiers, n_instances = predictions.shape
+    distinct_failures = np.zeros(n_classifiers, dtype=np.float32)
+
+    for i in xrange(n_instances):
+        truth = y_true[i]
+        count = Counter(predictions[:, i])
+        for cls, n_votes in count.items():
+            if cls != truth:
+                distinct_failures[n_votes - 1] += 1
+
+    distinct_failures_count = np.sum(distinct_failures)
+
+    dfd = 0.
+    for j in xrange(n_classifiers):
+        dfd += (float(n_classifiers - (j + 1))/float(n_classifiers - 1)) * (distinct_failures[j] / distinct_failures_count)
+
+    return dfd
 
 
 def get_fitness(ensemble, fitness, predictions, y_val):
@@ -173,7 +203,7 @@ def main():
         X_train, y_train, X_val, y_val,
         base_classifier=clf,
         n_classifiers=200,
-        n_generations=15
+        n_generations=2
     )
 
     check_distribution(ensemble, population, X_test, y_test)
