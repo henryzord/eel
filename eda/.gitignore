@@ -9,6 +9,7 @@ __pycache__/
 *.so
 
 generation_population.csv
+selection_population.csv
 
 # Distribution / packaging
 .Python

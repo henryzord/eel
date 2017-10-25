@@ -1,5 +1,6 @@
 import json
-from collections import Counter
+from datetime import datetime as dt
+from multiprocessing import Process
 
 import numpy as np
 import pandas as pd
@@ -7,11 +8,9 @@ from bitarray import bitarray
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
 
-from eda.core import get_fronts, __get_classifier__
+from core import check_distribution, __encode_gm__
+from eda.core import __get_classifier__
 from eda.dataset import load_sets
-from datetime import datetime as dt
-from multiprocessing import Process
-from core import check_distribution
 from integration import __ensemble_predict__
 
 '''
@@ -29,35 +28,6 @@ def __save_population__(population):
     dense = np.array(map(lambda x: x.tolist(), population))
 
     pd.DataFrame(dense).to_csv('generation_population.csv', sep=',', index=False)
-
-
-def distinct_failure_diversity(predictions, y_true):
-    """
-    Imlements distinct failure diversity. See
-        Derek Partridge & Wo jtek Krzanowski. Distinct Failure Diversity in Multiversion Software. 1997
-        for more information.
-
-    :param predictions:
-    :param y_true:
-    :return:
-    """
-    n_classifiers, n_instances = predictions.shape
-    distinct_failures = np.zeros(n_classifiers, dtype=np.float32)
-
-    for i in xrange(n_instances):
-        truth = y_true[i]
-        count = Counter(predictions[:, i])
-        for cls, n_votes in count.items():
-            if cls != truth:
-                distinct_failures[n_votes - 1] += 1
-
-    distinct_failures_count = np.sum(distinct_failures)
-
-    dfd = 0.
-    for j in xrange(n_classifiers):
-        dfd += (float(n_classifiers - (j + 1))/float(n_classifiers - 1)) * (distinct_failures[j] / distinct_failures_count)
-
-    return dfd
 
 
 def get_fitness(ensemble, fitness, predictions, y_val):
@@ -108,23 +78,6 @@ def get_fitness(ensemble, fitness, predictions, y_val):
     return fitness
 
 
-def __replace_population__(population, fitness, p, medians):
-    fronts = get_fronts(fitness)
-    # start picking individuals from these fronts
-
-    to_pick = []
-
-    flat_list = [item for sublist in fronts for item in sublist]
-    for i, ind in enumerate(flat_list):
-        # if any(np.array(fitness[ind]) < np.array(medians)):
-        #     break
-        if i < (len(population) / 2):
-            to_pick += [population[ind].tolist()]
-
-    p = np.mean(to_pick, axis=0).ravel()
-    return p
-
-
 def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100, n_generations=100, save_every=5):
     X_features = X_train.columns
     n_features = len(X_features)
@@ -137,7 +90,7 @@ def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100,
     n_instances_val = X_val.shape[0]
 
     initial_prob = 0.5
-    p = np.full(shape=n_features, fill_value=initial_prob, dtype=np.float32)
+    gm = np.full(shape=n_features, fill_value=initial_prob, dtype=np.float32)
 
     ensemble = np.empty(n_classifiers, dtype=np.object)
 
@@ -153,7 +106,7 @@ def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100,
     for g in xrange(n_generations):
         for j in xrange(n_classifiers):
             for k in xrange(n_features):
-                population[j][k] = np.random.choice(a=[0, 1], p=[1. - p[k], p[k]])
+                population[j][k] = np.random.choice(a=[0, 1], p=[1. - gm[k], gm[k]])
 
             selected_features = X_features[list(population[j])]
             ensemble[j], predictions[j] = __get_classifier__(
@@ -167,11 +120,11 @@ def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100,
         medians = np.median(fitness, axis=0)
         means = np.mean(fitness, axis=0)
 
-        p = __replace_population__(population, fitness, p, medians)
+        gm = __encode_gm__(population, fitness)
 
         t2 = dt.now()
 
-        if g % save_every == 0:
+        if (g % save_every == 0) and (g > 0):
             Process(
                 target=__save_population__,
                 kwargs=dict(population=population)
@@ -182,7 +135,10 @@ def generate(X_train, y_train, X_val, y_val, base_classifier, n_classifiers=100,
         )
         t1 = t2
 
-    __save_population__(population=population)
+    Process(
+        target=__save_population__,
+        kwargs=dict(population=population)
+    ).start()
 
     dense = np.array(map(lambda x: x.tolist(), population))
     return ensemble, dense, fitness
@@ -202,8 +158,8 @@ def main():
     ensemble, population, accs = generate(
         X_train, y_train, X_val, y_val,
         base_classifier=clf,
-        n_classifiers=200,
-        n_generations=2
+        n_classifiers=500,
+        n_generations=50
     )
 
     check_distribution(ensemble, population, X_test, y_test)

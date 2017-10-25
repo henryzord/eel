@@ -5,6 +5,32 @@ import itertools as it
 import pandas as pd
 
 
+def __encode_gm__(population, fitness):
+    """
+    Encodes a new graphical model based on a population of individuals in Pareto Fronts.
+
+    :param population:
+    :param fitness:
+    :return:
+    """
+    to_pick = []
+
+    # where first position is the first front, second position is the first front, and so on
+    fronts = get_fronts(fitness)
+    # compress list of lists in a single list of ordered individuals, based on their non-dominated rank
+    flat_list = [item for sublist in fronts for item in sublist]
+
+    # start picking individuals from these fronts
+    for i, ind in enumerate(flat_list):
+        # if any(np.array(fitness[ind]) < np.array(medians)):
+        #     break
+        if i < (len(population) / 2):
+            to_pick += [population[ind].tolist()]
+
+    gm = np.sum(to_pick, axis=0) / float(len(to_pick))
+    return gm
+
+
 def check_distribution(ensemble, features, X, y):
     n_classifiers = len(ensemble)
 
@@ -15,7 +41,7 @@ def check_distribution(ensemble, features, X, y):
     for i, classifier, features in it.izip(np.arange(n_classifiers), ensemble, features):
         preds[i] = classifier.predict(X[X_features[features]])
 
-    print 'distribution of votes per instance in validation set:'
+    print 'distribution of votes per instance in evaluation set:'
 
     counts = map(lambda x: Counter(preds[:, x]), xrange(y.shape[0]))
 
@@ -130,14 +156,12 @@ def get_fronts(pop):
         _where = (dominated == 0)
 
         if _where.max() == 0:  # no individuals that are not dominated by any other; add remaining
-            fronts += [np.flatnonzero(added == 0)]  # TODO sort based on non-crowding distance!
+            fronts += [np.flatnonzero(added == 0)]
             break
 
         added[_where] = 1
 
         current_front = np.flatnonzero(_where)
-
-        # TODO sort based on crowding distance!
 
         fronts += [crowding_distance_sort(pop, current_front)]
         dominated[_where] = -1
@@ -149,5 +173,4 @@ def get_fronts(pop):
 
         cur_front += 1
 
-    # TODO must sort individuals based on their crowding distance!
     return fronts

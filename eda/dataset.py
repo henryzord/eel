@@ -21,6 +21,13 @@ def load_arff(dataset_path):
 
 
 def process_arff(path):
+    """
+    Given a path to an arff, transforms it to a pandas.DataFrame,
+    whilst also inputting missing values with the mean for each column.
+    :param path:
+    :return:
+    """
+
     file_arff = load_arff(path)
 
     file_df = pd.DataFrame(
@@ -37,7 +44,7 @@ def process_arff(path):
     return file_df
 
 
-def make_and_write_sets(path):
+def make_and_write_sets(path, sizes):
     df = process_arff(path)
 
     print 'full size:', df.shape
@@ -48,11 +55,10 @@ def make_and_write_sets(path):
 
     df[df.columns[-1]] = map(lambda x: dict_converter[x], df[df.columns[-1]])
 
-    sizes = [0.5, 0.25, 0.25]
     indices = range(df.shape[0])
     np.random.shuffle(indices)
 
-    for name, size in it.izip(['train', 'val', 'test'], sizes):
+    for name, size in sizes.items():
         set_indices = np.random.choice(indices, size=int(len(indices) * size), replace=False)
 
         indices = list(set(indices) - set(set_indices))
@@ -62,10 +68,6 @@ def make_and_write_sets(path):
 
 
 def load_sets(train_path, val_path, test_path):
-    # train_path = '/home/henry/Projects/metatree/datasets/iris/iris_fold_1.arff'
-    # val_path = '/home/henry/Projects/metatree/datasets/iris/iris_fold_2.arff'
-    # test_path = '/home/henry/Projects/metatree/datasets/iris/iris_fold_3.arff'
-
     train_df = process_arff(train_path)
     val_df = process_arff(val_path)
     test_df = process_arff(test_path)
@@ -91,4 +93,11 @@ def load_sets(train_path, val_path, test_path):
 
 
 if __name__ == '__main__':
-    make_and_write_sets('/home/henry/Projects/eel/datasets/ionosphere/ionosphere.arff')
+    make_and_write_sets(
+        '/home/henry/Projects/eel/datasets/ionosphere/ionosphere.arff',
+        sizes=dict(
+            train=0.5,
+            val=0.25,
+            test=0.25
+        )
+    )

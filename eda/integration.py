@@ -8,7 +8,6 @@ from eda.core import load_population
 from eda.dataset import load_sets
 import pandas as pd
 
-from eda.selection import select
 from sklearn.tree import DecisionTreeClassifier as clf
 from datetime import datetime as dt
 
@@ -144,6 +143,7 @@ def main():
 
     print 'loading population...'
     _population = pd.read_csv('generation_population.csv', sep=',').values
+    _binary = pd.read_csv('selection_population.csv', sep=',').values
 
     _ensemble, _population, predictions = load_population(clf, _population, X_train, y_train, X_val, y_val)
 
@@ -153,7 +153,7 @@ def main():
 
     _best_weights = integrate(
         _best_predictions, y_val,
-        n_individuals=100, n_generations=15,
+        n_individuals=1000, n_generations=100,
         test_predictions=test_predictions,
         y_test=y_test
     )
