@@ -50,7 +50,21 @@ def check_distribution(ensemble, features, X, y):
     print df
 
 
-def load_population(base_classifier, population, X_train, y_train, X_val, y_val):
+def get_predictions(classifiers, features, X):
+    n_classifiers, n_features = features.shape
+
+    X_features = X.columns
+
+    preds = np.empty((n_classifiers, X.shape[0]), dtype=np.int32)
+
+    for j in xrange(n_classifiers):  # number of base classifiers
+        selected_features = X_features[features[j]]
+        preds[j, :] = classifiers[j].predict(X[selected_features])
+
+    return preds
+
+
+def load_population(base_classifier, population, X_train, y_train, X_val, y_val, verbose=True):
     X_features = X_train.columns
 
     n_classifiers, n_attributes = population.shape
@@ -64,7 +78,7 @@ def load_population(base_classifier, population, X_train, y_train, X_val, y_val)
             base_classifier, selected_features,
             X_train, y_train, X_val
         )
-        if j % 50 == 0:
+        if j % 50 == 0 and verbose:
             print 'Loaded %d classifiers' % j
 
     return ensemble, population, predictions

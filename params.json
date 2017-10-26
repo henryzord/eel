@@ -1,5 +1,10 @@
 {
   "train_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_train.arff",
   "val_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_val.arff",
-  "test_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_test.arff"
+  "test_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_test.arff",
+  "full_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_full.arff",
+  "random_state": 0,
+  "n_folds": 10,
+  "n_individuals": 500,
+  "n_generations": 10
 }

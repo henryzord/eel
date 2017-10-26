@@ -142,19 +142,19 @@ def main():
     )
 
     print 'loading population...'
-    _population = pd.read_csv('generation_population.csv', sep=',').values
-    _binary = pd.read_csv('selection_population.csv', sep=',').values
+    gen_pop = pd.read_csv('generation_population.csv', sep=',').values
+    sel_pop = pd.read_csv('selection_population.csv', sep=',', header=None).values.ravel()
 
-    _ensemble, _population, predictions = load_population(clf, _population, X_train, y_train, X_val, y_val)
+    classifiers, gen_pop, predictions = load_population(clf, gen_pop, X_train, y_train, X_val, y_val)
+    _, _, test_predictions = load_population(clf, gen_pop, X_train, y_train, X_test, y_test)
 
-    _best_classifiers, _best_features, _best_predictions = select(_ensemble, _population, predictions, X_val, y_val)
-
-    _, _, test_predictions = load_population(clf, _population, X_train, y_train, X_test, y_test)
+    # classifiers[sel_pop], gen_pop[sel_pop], predictions[sel_pop]
+    # _best_classifiers, _best_features, _best_predictions = select(_ensemble, _population, predictions, X_val, y_val)
 
     _best_weights = integrate(
-        _best_predictions, y_val,
-        n_individuals=1000, n_generations=100,
-        test_predictions=test_predictions,
+        predictions[sel_pop], y_val,
+        n_individuals=500, n_generations=10,
+        test_predictions=test_predictions[sel_pop],
         y_test=y_test
     )
 
@@ -162,7 +162,7 @@ def main():
         Now testing
     '''
 
-    y_test_pred = __ensemble_predict__(_best_weights, test_predictions)
+    y_test_pred = __ensemble_predict__(_best_weights, test_predictions[sel_pop])
     test_accuracy = accuracy_score(y_test, y_test_pred)
     print 'test accuracy: %.2f' % test_accuracy
 

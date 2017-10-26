@@ -142,7 +142,7 @@ def main():
     _population = pd.read_csv('generation_population.csv', sep=',').values
 
     _ensemble, _population, val_predictions = load_population(clf, _population, X_train, y_train, X_val, y_val)
-    # _, _, test_predictions = load_population(clf, _population, X_train, y_train, X_test, y_test)
+    _, _, test_predictions = load_population(clf, _population, X_train, y_train, X_test, y_test, verbose=False)
 
     _best_classifiers = eda_select(
         _population, val_predictions, y_val,
@@ -150,12 +150,12 @@ def main():
         n_generations=10,
     )
 
-    dummy_weights = np.ones((len(_best_classifiers), len(np.unique(y_val))), dtype=np.float32)
+    dummy_weights = np.ones((len(_best_classifiers), len(np.unique(y_test))), dtype=np.float32)
 
-    ensemble_preds = __ensemble_predict__(dummy_weights, val_predictions[_best_classifiers])
-    ensemble_acc = accuracy_score(y_val, ensemble_preds)
+    ensemble_preds = __ensemble_predict__(dummy_weights, test_predictions[_best_classifiers])
+    ensemble_acc = accuracy_score(y_test, ensemble_preds)
 
-    print 'ensemble validation accuracy: %.2f' % ensemble_acc
+    print 'ensemble test accuracy: %.2f' % ensemble_acc
 
 
 if __name__ == '__main__':

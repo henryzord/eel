@@ -155,7 +155,7 @@ def main():
         params['test_path']
     )
 
-    ensemble, population, accs = generate(
+    ensemble, population, fitness = generate(
         X_train, y_train, X_val, y_val,
         base_classifier=clf,
         n_classifiers=500,
@@ -166,10 +166,10 @@ def main():
 
     print 'base learners x features:', population.shape
     print 'accuracies:'
-    print 'min:\t %.7f' % np.min(accs)
-    print 'median:\t %.7f' % np.median(accs)
-    print 'mean:\t %.7f' % np.mean(accs)
-    print 'max:\t %.7f' % np.max(accs)
+    print 'min:\t %.7f' % np.min(fitness)
+    print 'median:\t %.7f' % np.median(fitness)
+    print 'mean:\t %.7f' % np.mean(fitness)
+    print 'max:\t %.7f' % np.max(fitness)
 
 
 if __name__ == '__main__':

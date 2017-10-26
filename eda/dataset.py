@@ -20,12 +20,15 @@ def load_arff(dataset_path):
     return af
 
 
-def process_arff(path):
+def load_dataframe(path):
     """
     Given a path to an arff, transforms it to a pandas.DataFrame,
     whilst also inputting missing values with the mean for each column.
+
+    :type path: str
     :param path:
     :return:
+    :rtype: pandas.DataFrame
     """
 
     file_arff = load_arff(path)
@@ -45,7 +48,7 @@ def process_arff(path):
 
 
 def make_and_write_sets(path, sizes):
-    df = process_arff(path)
+    df = load_dataframe(path)
 
     print 'full size:', df.shape
 
@@ -68,9 +71,9 @@ def make_and_write_sets(path, sizes):
 
 
 def load_sets(train_path, val_path, test_path):
-    train_df = process_arff(train_path)
-    val_df = process_arff(val_path)
-    test_df = process_arff(test_path)
+    train_df = load_dataframe(train_path)
+    val_df = load_dataframe(val_path)
+    test_df = load_dataframe(test_path)
 
     X_train = train_df[train_df.columns[:-1]]
     y_train = train_df[train_df.columns[-1]]
