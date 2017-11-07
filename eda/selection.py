@@ -7,19 +7,9 @@ import pandas as pd
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
 
-from eda.core import load_population, get_classes
+from eda.core import load_population, get_classes, DummyIterator
 from core import check_distribution, __pareto_encode_gm__
 from datetime import datetime as dt
-
-
-def __save_population__(population, fitness):
-    print '\tsaving population...'
-
-    medians = np.median(fitness, axis=0)
-    selected = np.multiply.reduce(fitness >= medians, axis=1)
-    ref = np.flatnonzero(selected)[0]
-
-    pd.DataFrame(population[ref]).to_csv('selection_population.csv', sep=',', index=False, header=False)
 
 
 def distinct_failure_diversity(predictions, y_true):
@@ -90,16 +80,36 @@ def get_selection_fitness(individual_preds, y_true):
 
 
 def eda_select(
-        gen_pop, val_predictions, y_val,
+        features, classifiers, val_predictions, y_val,
         n_individuals=100, n_generations=100, save_every=5, reporter=None
 ):
+    """
 
-    n_classifiers, n_features = gen_pop.shape
+
+    :param features:
+    :param val_predictions:
+    :param y_val:
+    :param n_individuals:
+    :param n_generations:
+    :param save_every:
+    :type reporter: eda.Reporter
+    :param reporter:
+    :return:
+    """
+
+    n_classifiers, n_features = features.shape
     n_objectives = 2
 
     gm = np.full(n_classifiers, 0.5, dtype=np.float32)
     sel_pop = np.empty((n_individuals, n_classifiers), dtype=np.bool)
     fitness = np.empty((n_individuals, n_objectives), dtype=np.float32)
+
+    n_classes = len(np.unique(y_val))
+
+    dummy_weights = np.empty(
+        (n_individuals, n_classifiers, n_classes),
+        dtype=np.float32
+    )
 
     t1 = dt.now()
 
@@ -107,6 +117,7 @@ def eda_select(
         for i in xrange(n_individuals):
             for j in xrange(n_classifiers):
                 sel_pop[i, j] = np.random.choice(a=[True, False], p=[gm[j], 1. - gm[j]])
+                dummy_weights[i, j, :] = sel_pop[i, j]
 
             fitness[i, :] = get_selection_fitness(val_predictions[sel_pop[i]], y_val)
 
@@ -115,25 +126,19 @@ def eda_select(
 
         t2 = dt.now()
 
+        reporter.callback(eda_select, g, dummy_weights, features, classifiers)
+        reporter.save_population(eda_select, sel_pop, g, save_every)
+
         print 'generation %2.d: median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
             g, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
         )
         t1 = t2
-
-        if (g % save_every == 0) and (g > 0):
-            Process(
-                target=__save_population__,
-                kwargs=dict(population=sel_pop, fitness=fitness)
-            ).start()
 
         gm = __pareto_encode_gm__(sel_pop, fitness)
 
     medians = np.median(fitness, axis=0)
     selected = np.multiply.reduce(fitness >= medians, axis=1)
 
-    Process(
-        target=__save_population__,
-        kwargs=dict(population=sel_pop, fitness=fitness)
-    ).start()
+    reporter.save_population(eda_select, sel_pop)
 
-    return sel_pop[np.flatnonzero(selected)[0]]
+    return selected

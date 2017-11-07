@@ -27,18 +27,18 @@ class Reporter(object):
         self.date = str(dt.now())
         self.output_path = output_path
         self.manager = Manager()
-        self.process_dict = self.manager.dict()
+        self.report_dict = self.manager.dict()
 
     def callback(self, func, gen, weights, features, classifiers):
-        # self.__report__(func, gen, weights, features, classifiers)
+        self.__report__(func, gen, weights, features, classifiers)
         # raise NotImplementedError('not implemented yet!')
 
-        p = Process(
-            target=self.__report__, args=(
-                func, gen, weights, features, classifiers
-            )
-        )
-        p.start()
+        # p = Process(
+        #     target=self.__report__, args=(
+        #         func, gen, weights, features, classifiers
+        #     )
+        # )
+        # p.start()
 
     def __report__(self, func, gen, weights, features, classifiers):
         n_sets = len(self.Xs)
@@ -56,9 +56,9 @@ class Reporter(object):
                 counter += 1
 
         # control access to file
-        while len(self.process_dict) > 0:
+        while len(self.report_dict) > 0:
             time.sleep(30)
-        self.process_dict[hash(func.__name__ + str(gen))] = 1
+        self.report_dict[hash(func.__name__ + str(gen))] = 1
 
         output = os.path.join(self.output_path, self.date + '_' + 'report_' + func.__name__ + '.csv')
         # if not opened
@@ -78,23 +78,25 @@ class Reporter(object):
                     counter += 1
 
         # control access to file
-        del self.process_dict[hash(func.__name__ + str(gen))]
+        del self.report_dict[hash(func.__name__ + str(gen))]
 
     def save_population(self, func, population, gen=1, save_every=1):
-        def __save_generation__(_output_path, _date, _func, _population):
+        def __save__(_output_path, _date, _func, _population):
             dense = np.array(map(lambda x: x.tolist(), _population))
             pd.DataFrame(dense).to_csv(
                 os.path.join(_output_path, _date + '_' + 'population' + '_' + _func.__name__ + '.csv'),
                 sep=',',
-                index=False
+                index=False,
+                header=False
             )
 
         if (gen > 0) and (gen % save_every == 0):
-            if func.__name__ == 'generate':
-                Process(
-                    target=__save_generation__,
-                    args=(self.output_path, self.date, func, population)
-                ).start()
+            # TODO change for parallel process!
+            __save__(self.output_path, self.date, func, population)
+            # Process(
+            #     target=__save__,
+            #     args=(self.output_path, self.date, func, population)
+            # ).start()
 
 
 def eel(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
@@ -102,7 +104,7 @@ def eel(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
     print '--------------------- generation ----------------------'
     print '-------------------------------------------------------'
 
-    ensemble, gen_pop, fitness = generate(
+    classifiers, features, fitness = generate(
         X_train, y_train, X_val, y_val,
         base_classifier=clf,
         n_classifiers=params['generation']['n_individuals'],
@@ -110,17 +112,15 @@ def eel(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
         reporter=reporter
     )
 
-    raise NotImplementedError('not implemented yet!')
-
-    val_predictions = get_predictions(ensemble, gen_pop, X_val)
-    test_predictions = get_predictions(ensemble, gen_pop, X_test)
+    val_predictions = get_predictions(classifiers, features, X_val)
+    test_predictions = get_predictions(classifiers, features, X_test)
 
     print '-------------------------------------------------------'
     print '---------------------- selection ----------------------'
     print '-------------------------------------------------------'
 
     best_classifiers = eda_select(
-        gen_pop, val_predictions, y_val,
+        features, classifiers, val_predictions, y_val,
         n_individuals=params['selection']['n_individuals'],
         n_generations=params['selection']['n_generations'],
         reporter=reporter
@@ -131,18 +131,18 @@ def eel(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
     print '-------------------------------------------------------'
 
     _best_weights = integrate(
-        val_predictions[best_classifiers], y_val,
+        features[np.where(best_classifiers)], classifiers[np.where(best_classifiers)],
+        val_predictions[np.where(best_classifiers)], y_val,
         n_individuals=params['integration']['n_individuals'],
         n_generations=params['integration']['n_generations'],
-        test_predictions=test_predictions[best_classifiers],
-        y_test=y_test
+        reporter=reporter
     )
 
     '''
         Now testing
     '''
 
-    y_test_pred = get_classes(_best_weights, test_predictions[best_classifiers])
+    y_test_pred = get_classes(_best_weights, test_predictions[np.where(best_classifiers)])
     return y_test_pred
 
 

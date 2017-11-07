@@ -29,25 +29,33 @@ def __ensemble_predict_matrix__(voting_weights, predictions):
 # -------------------------------------------------------------------------------------- #
 
 
-def integrate(val_predictions, y_val, n_individuals=100, n_generations=100, test_predictions=None, y_test=None):
+def integrate(
+    features, classifiers, val_predictions, y_val,
+    n_individuals=100, n_generations=100,
+    save_every=5, reporter=None
+):
+    """
+
+    :param val_predictions:
+    :param y_val:
+    :param n_individuals:
+    :param n_generations:
+    :param save_every:
+    :type reporter: eda.Reporter
+    :param reporter:
+    :return:
+    """
+
     classes = np.unique(y_val)
     n_classes = len(classes)
 
     n_objectives = 2
-
-    if test_predictions is not None:
-        best_test_acc = -1
 
     n_classifiers, n_val_instances = val_predictions.shape
 
     population = np.empty((n_individuals, n_classifiers, n_classes), dtype=np.float32)
     fitness = np.empty(n_individuals, dtype=np.float32)
 
-    # TODO distribution must be uniform in first iteration!
-
-    min_weight = 0.1
-    max_weight = 0.9
-    # std = ((1./12.) * (max_weight - min_weight) ** 2.) ** (1./2.)
     std = 1.
 
     loc = np.random.uniform(size=(n_classifiers, n_classes), low=1., high=10.)
@@ -66,13 +74,8 @@ def integrate(val_predictions, y_val, n_individuals=100, n_generations=100, test
             y_val_pred = get_classes(population[i], val_predictions)
             fitness[i] = accuracy_score(y_val, y_val_pred)
 
-            if test_predictions is not None:
-                y_test_pred = get_classes(population[i], test_predictions)
-                test_acc = accuracy_score(y_test, y_test_pred)
-
-                if test_acc > best_test_acc:
-                    best_test_acc = test_acc
-                    related_val_acc = fitness[i]
+        reporter.callback(integrate, g, population, features, classifiers)
+        reporter.save_population(integrate, population, g, save_every)
 
         # update
         median = np.median(fitness)
@@ -83,18 +86,17 @@ def integrate(val_predictions, y_val, n_individuals=100, n_generations=100, test
             break
 
         fit = population[selected]
-
         loc = np.mean(fit, axis=0)
-        # scale = np.std(fit, axis=0)
-
         t2 = dt.now()
 
         # report
         print 'generation %d: min: %.7f median: %.7f mean: %.7f max: %.7f time elapsed: %f' % (
             g, np.min(fitness), np.median(fitness), np.mean(fitness), np.max(fitness), (t2 - t1).total_seconds()
-        ) + (' best_test: %.2f' % best_test_acc) if y_test is not None else ''
+        )
 
         t1 = t2
+
+        reporter.save_population(integrate, population)
 
     median = np.median(fitness)
     selected = np.flatnonzero(fitness > median)

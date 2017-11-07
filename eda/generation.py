@@ -104,12 +104,13 @@ def generate(
     n_features = len(X_features)
     n_objectives = 2  # accuracy and diversity
 
+    # -- dummy weights -- #
     n_classes = len(np.unique(y_val))
-
     dummy_weights = np.ones((n_classifiers, n_classes), dtype=np.float32)
     dummy_weight_vector = DummyIterator(  # whole population of classifiers equals to one ensemble
         dummy_weights, length=1, reset=True
     )
+    # -- dummy weights -- #
 
     n_instances_val = X_val.shape[0]
 
