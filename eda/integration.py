@@ -1,15 +1,12 @@
 import json
-from collections import Counter
+from datetime import datetime as dt
 
 import numpy as np
-from sklearn.metrics import accuracy_score
-
-from eda.core import load_population
-from eda.dataset import load_sets
 import pandas as pd
-
+from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
-from datetime import datetime as dt
+
+from eda.core import load_population, get_classes
 
 
 def __ensemble_predict_matrix__(voting_weights, predictions):
@@ -23,26 +20,6 @@ def __ensemble_predict_matrix__(voting_weights, predictions):
 
         for j in xrange(n_classifiers):
             global_votes[i, predictions[j, i]] += voting_weights[j, predictions[j, i]]
-
-    return global_votes
-
-
-def __ensemble_predict__(voting_weights, predictions):
-    # TODO wrong! how can it predict if it doesn't know the class??
-
-    n_classifiers, n_classes = voting_weights.shape
-    n_classifiers, n_instances = predictions.shape
-
-    local_votes = np.empty(n_classes, dtype=np.float32)
-    global_votes = np.empty(n_instances, dtype=np.int32)
-
-    for i in xrange(n_instances):
-        local_votes[:] = 0.
-
-        for j in xrange(n_classifiers):
-            local_votes[predictions[j, i]] += voting_weights[j, predictions[j, i]]
-
-        global_votes[i] = np.argmax(local_votes)
 
     return global_votes
 
@@ -86,11 +63,11 @@ def integrate(val_predictions, y_val, n_individuals=100, n_generations=100, test
 
             population[i] = np.clip(population[i], a_min=0., a_max=1.)
 
-            y_val_pred = __ensemble_predict__(population[i], val_predictions)
+            y_val_pred = get_classes(population[i], val_predictions)
             fitness[i] = accuracy_score(y_val, y_val_pred)
 
             if test_predictions is not None:
-                y_test_pred = __ensemble_predict__(population[i], test_predictions)
+                y_test_pred = get_classes(population[i], test_predictions)
                 test_acc = accuracy_score(y_test, y_test_pred)
 
                 if test_acc > best_test_acc:
@@ -128,44 +105,3 @@ def integrate(val_predictions, y_val, n_individuals=100, n_generations=100, test
         best_weights = population[selected[0], :, :]
 
     return best_weights
-
-
-def main():
-    params = json.load(open('../params.json', 'r'))
-
-    print 'loading datasets...'
-
-    X_train, X_val, X_test, y_train, y_val, y_test = load_sets(
-        params['train_path'],
-        params['val_path'],
-        params['test_path']
-    )
-
-    print 'loading population...'
-    gen_pop = pd.read_csv('generation_population.csv', sep=',').values
-    sel_pop = pd.read_csv('selection_population.csv', sep=',', header=None).values.ravel()
-
-    classifiers, gen_pop, predictions = load_population(clf, gen_pop, X_train, y_train, X_val, y_val)
-    _, _, test_predictions = load_population(clf, gen_pop, X_train, y_train, X_test, y_test)
-
-    # classifiers[sel_pop], gen_pop[sel_pop], predictions[sel_pop]
-    # _best_classifiers, _best_features, _best_predictions = select(_ensemble, _population, predictions, X_val, y_val)
-
-    _best_weights = integrate(
-        predictions[sel_pop], y_val,
-        n_individuals=500, n_generations=10,
-        test_predictions=test_predictions[sel_pop],
-        y_test=y_test
-    )
-
-    '''
-        Now testing
-    '''
-
-    y_test_pred = __ensemble_predict__(_best_weights, test_predictions[sel_pop])
-    test_accuracy = accuracy_score(y_test, y_test_pred)
-    print 'test accuracy: %.2f' % test_accuracy
-
-
-if __name__ == '__main__':
-    main()

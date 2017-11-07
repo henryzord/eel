@@ -7,12 +7,9 @@ import pandas as pd
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
 
-from eda.core import load_population
-from eda.dataset import load_sets
-from core import check_distribution, __encode_gm__
+from eda.core import load_population, get_classes
+from core import check_distribution, __pareto_encode_gm__
 from datetime import datetime as dt
-
-from eda.integration import __ensemble_predict__
 
 
 def __save_population__(population, fitness):
@@ -31,25 +28,36 @@ def distinct_failure_diversity(predictions, y_true):
         Derek Partridge & Wo jtek Krzanowski. Distinct Failure Diversity in Multiversion Software. 1997
         for more information.
 
+    :type predictions: numpy.ndarray
     :param predictions:
+    :type y_true: pandas.Series
     :param y_true:
     :return:
     """
+    if isinstance(predictions, pd.DataFrame):
+        predictions = predictions.values
+
+    if isinstance(y_true, pd.Series):
+        y_true = y_true.tolist()
+
     n_classifiers, n_instances = predictions.shape
-    distinct_failures = np.zeros(n_classifiers, dtype=np.float32)
+    distinct_failures = np.zeros(n_classifiers + 1, dtype=np.float32)
 
     for i in xrange(n_instances):
         truth = y_true[i]
         count = Counter(predictions[:, i])
         for cls, n_votes in count.items():
             if cls != truth:
-                distinct_failures[n_votes - 1] += 1
+                distinct_failures[n_votes] += 1
 
-    distinct_failures_count = np.sum(distinct_failures)
+    distinct_failures_count = np.sum(distinct_failures)  # type: int
 
     dfd = 0.
-    for j in xrange(n_classifiers):
-        dfd += (float(n_classifiers - (j + 1))/float(n_classifiers - 1)) * (distinct_failures[j] / distinct_failures_count)
+
+    if distinct_failures_count > 0:
+        for j in xrange(1, n_classifiers + 1):
+            dfd += (float(n_classifiers - j)/float(n_classifiers - 1)) * \
+                   (float(distinct_failures[j]) / distinct_failures_count)
 
     return dfd
 
@@ -81,7 +89,11 @@ def get_selection_fitness(individual_preds, y_true):
     return acc, div
 
 
-def eda_select(gen_pop, val_predictions, y_val, n_individuals=100, n_generations=100, test_predictions=None, save_every=5):
+def eda_select(
+        gen_pop, val_predictions, y_val,
+        n_individuals=100, n_generations=100, save_every=5, reporter=None
+):
+
     n_classifiers, n_features = gen_pop.shape
     n_objectives = 2
 
@@ -114,7 +126,7 @@ def eda_select(gen_pop, val_predictions, y_val, n_individuals=100, n_generations
                 kwargs=dict(population=sel_pop, fitness=fitness)
             ).start()
 
-        gm = __encode_gm__(sel_pop, fitness)
+        gm = __pareto_encode_gm__(sel_pop, fitness)
 
     medians = np.median(fitness, axis=0)
     selected = np.multiply.reduce(fitness >= medians, axis=1)
@@ -125,38 +137,3 @@ def eda_select(gen_pop, val_predictions, y_val, n_individuals=100, n_generations
     ).start()
 
     return sel_pop[np.flatnonzero(selected)[0]]
-
-
-def main():
-    params = json.load(open('../params.json', 'r'))
-
-    print 'loading datasets...'
-
-    X_train, X_val, X_test, y_train, y_val, y_test = load_sets(
-        params['train_path'],
-        params['val_path'],
-        params['test_path']
-    )
-
-    print 'loading population...'
-    _population = pd.read_csv('generation_population.csv', sep=',').values
-
-    _ensemble, _population, val_predictions = load_population(clf, _population, X_train, y_train, X_val, y_val)
-    _, _, test_predictions = load_population(clf, _population, X_train, y_train, X_test, y_test, verbose=False)
-
-    _best_classifiers = eda_select(
-        _population, val_predictions, y_val,
-        n_individuals=500,
-        n_generations=10,
-    )
-
-    dummy_weights = np.ones((len(_best_classifiers), len(np.unique(y_test))), dtype=np.float32)
-
-    ensemble_preds = __ensemble_predict__(dummy_weights, test_predictions[_best_classifiers])
-    ensemble_acc = accuracy_score(y_test, ensemble_preds)
-
-    print 'ensemble test accuracy: %.2f' % ensemble_acc
-
-
-if __name__ == '__main__':
-    main()
