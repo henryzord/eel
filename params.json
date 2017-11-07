@@ -7,8 +7,7 @@
     "generation": {
       "n_individuals": 10,
       "n_generations": 1,
-      "verbose": true,
-      "save_path": "/home/henry/Projects/eel/metadata"
+      "verbose": true
     },
     "selection": {
       "n_individuals": 10,

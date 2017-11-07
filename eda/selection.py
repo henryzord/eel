@@ -121,13 +121,19 @@ def eda_select(
 
             fitness[i, :] = get_selection_fitness(val_predictions[sel_pop[i]], y_val)
 
+        reporter.callback(eda_select, g, dummy_weights, features, classifiers)
+        reporter.save_population(eda_select, sel_pop, g, save_every)
+
         medians = np.median(fitness, axis=0)
         means = np.mean(fitness, axis=0)
 
-        t2 = dt.now()
+        selected = np.multiply.reduce(fitness >= medians, axis=1)
 
-        reporter.callback(eda_select, g, dummy_weights, features, classifiers)
-        reporter.save_population(eda_select, sel_pop, g, save_every)
+        if np.count_nonzero(selected) == 0:
+            print 'no individual is better than median; aborting...'
+            break
+
+        t2 = dt.now()
 
         print 'generation %2.d: median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
             g, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
