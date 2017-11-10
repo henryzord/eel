@@ -81,12 +81,6 @@ def integrate(
         median = np.median(fitness)
         selected = fitness > median
 
-        if np.count_nonzero(selected) == 0:
-            print 'no individual is better than median; aborting...'
-            break
-
-        fit = population[selected]
-        loc = np.mean(fit, axis=0)
         t2 = dt.now()
 
         # report
@@ -95,6 +89,12 @@ def integrate(
         )
 
         t1 = t2
+
+        if np.count_nonzero(selected) == 0:
+            break
+
+        fit = population[selected]
+        loc = np.mean(fit, axis=0)
 
         reporter.save_population(integrate, population)
 

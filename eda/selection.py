@@ -44,7 +44,7 @@ def distinct_failure_diversity(predictions, y_true):
 
     dfd = 0.
 
-    if distinct_failures_count > 0:
+    if (distinct_failures_count > 0) and (n_classifiers > 1):
         for j in xrange(1, n_classifiers + 1):
             dfd += (float(n_classifiers - j)/float(n_classifiers - 1)) * \
                    (float(distinct_failures[j]) / distinct_failures_count)

@@ -17,6 +17,9 @@ import os
 from datetime import datetime as dt
 import pandas as pd
 from pathlib2 import Path
+from generation import generate
+from selection import eda_select
+from integration import integrate
 
 
 class Reporter(object):
@@ -28,19 +31,33 @@ class Reporter(object):
         self.output_path = output_path
         self.manager = Manager()
         self.report_dict = self.manager.dict()
+        self.save_dict = self.manager.dict()
+        self.processes = []
+        self._fold = 1
+
+    @property
+    def fold(self):
+        return self._fold
+
+    @fold.setter
+    def fold(self, value):
+        self._fold = value
 
     def callback(self, func, gen, weights, features, classifiers):
-        self.__report__(func, gen, weights, features, classifiers)
-        # raise NotImplementedError('not implemented yet!')
+        # self.__report__(func, gen, weights, features, classifiers, dict())
 
-        # p = Process(
-        #     target=self.__report__, args=(
-        #         func, gen, weights, features, classifiers
-        #     )
-        # )
-        # p.start()
+        p = Process(
+            target=self.__report__, args=(
+                func, gen, weights, features, classifiers, self.report_dict
+            )
+        )
+        self.processes += [p]
+        p.start()
 
-    def __report__(self, func, gen, weights, features, classifiers):
+    def get_hash(self, func, gen):
+        return hash(func.__name__ + str(gen) + str(self.fold))
+
+    def __report__(self, func, gen, weights, features, classifiers, checkpoint):
         n_sets = len(self.Xs)
         n_individuals = len(weights)
 
@@ -56,9 +73,9 @@ class Reporter(object):
                 counter += 1
 
         # control access to file
-        while len(self.report_dict) > 0:
+        while len(checkpoint) > 0:
             time.sleep(30)
-        self.report_dict[hash(func.__name__ + str(gen))] = 1
+        checkpoint[self.get_hash(func, gen)] = 1
 
         output = os.path.join(self.output_path, self.date + '_' + 'report_' + func.__name__ + '.csv')
         # if not opened
@@ -78,11 +95,21 @@ class Reporter(object):
                     counter += 1
 
         # control access to file
-        del self.report_dict[hash(func.__name__ + str(gen))]
+        del checkpoint[self.get_hash(func, gen)]
 
     def save_population(self, func, population, gen=1, save_every=1):
-        def __save__(_output_path, _date, _func, _population):
-            dense = np.array(map(lambda x: x.tolist(), _population))
+        def __save__(_output_path, _date, _func, _population, checkpoint):
+            while len(checkpoint) > 0:
+                time.sleep(30)
+            checkpoint[self.get_hash(func, gen)] = 1
+
+            if func.__name__ == generate.__name__:
+                dense = np.array(map(lambda x: x.tolist(), _population))
+            elif func.__name__ == integrate.__name__:
+                dense = np.array(map(lambda x: x.ravel(), _population))
+            else:
+                dense = _population
+
             pd.DataFrame(dense).to_csv(
                 os.path.join(_output_path, _date + '_' + 'population' + '_' + _func.__name__ + '.csv'),
                 sep=',',
@@ -90,13 +117,20 @@ class Reporter(object):
                 header=False
             )
 
+            del checkpoint[self.get_hash(func, gen)]
+
         if (gen > 0) and (gen % save_every == 0):
-            # TODO change for parallel process!
-            __save__(self.output_path, self.date, func, population)
-            # Process(
-            #     target=__save__,
-            #     args=(self.output_path, self.date, func, population)
-            # ).start()
+            # __save__(self.output_path, self.date, func, population, dict())
+            p = Process(
+                target=__save__,
+                args=(self.output_path, self.date, func, population, self.save_dict)
+            )
+            self.processes += [p]
+            p.start()
+
+    def join_all(self):
+        for p in self.processes:
+            p.join()
 
 
 def eel(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
@@ -169,3 +203,5 @@ if __name__ == '__main__':
     preds = eel(metaparams, X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
     acc = accuracy_score(y_test, preds)
     print 'test accuracy: %.2f' % acc
+
+    reporter.join_all()
