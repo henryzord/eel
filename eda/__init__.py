@@ -23,9 +23,10 @@ from integration import integrate
 
 
 class Reporter(object):
-    def __init__(self, Xs, ys, set_names, output_path, n_jobs=4):
+    def __init__(self, Xs, ys, set_names, output_path, fold, n_jobs=4):
         self.Xs = Xs
         self.ys = ys
+        self.set_sizes = map(len, self.ys)
         self.set_names = set_names
         self.date = str(dt.now())
         self.output_path = output_path
@@ -33,7 +34,7 @@ class Reporter(object):
         self.report_dict = self.manager.dict()
         self.save_dict = self.manager.dict()
         self.processes = []
-        self._fold = 1
+        self._fold = fold
 
     @property
     def fold(self):
@@ -42,6 +43,22 @@ class Reporter(object):
     @fold.setter
     def fold(self, value):
         self._fold = value
+
+    def __get_hash__(self, func):
+        return hash(func.__name__ + str(self.fold))
+
+    def __check_in__(self, func, checkpoint):
+        _hash = self.__get_hash__(func)
+
+        while _hash in checkpoint:
+            time.sleep(30)
+        checkpoint[_hash] = True
+        return checkpoint
+
+    def __check_out__(self, func, checkpoint):
+        _hash = self.__get_hash__(func)
+        del checkpoint[_hash]
+        return checkpoint
 
     def callback(self, func, gen, weights, features, classifiers):
         # self.__report__(func, gen, weights, features, classifiers, dict())
@@ -53,9 +70,6 @@ class Reporter(object):
         )
         self.processes += [p]
         p.start()
-
-    def get_hash(self, func, gen):
-        return hash(func.__name__ + str(gen) + str(self.fold))
 
     def __report__(self, func, gen, weights, features, classifiers, checkpoint):
         n_sets = len(self.Xs)
@@ -73,9 +87,7 @@ class Reporter(object):
                 counter += 1
 
         # control access to file
-        while len(checkpoint) > 0:
-            time.sleep(30)
-        checkpoint[self.get_hash(func, gen)] = 1
+        checkpoint = self.__check_in__(func, checkpoint)
 
         output = os.path.join(self.output_path, self.date + '_' + 'report_' + func.__name__ + '.csv')
         # if not opened
@@ -83,7 +95,7 @@ class Reporter(object):
         if not pth.exists():
             with open(output, 'w') as f:
                 writer = csv.writer(f, delimiter=',')
-                writer.writerow(['method', 'generation', 'individual', 'set', 'accuracy'])
+                writer.writerow(['method', 'fold', 'generation', 'individual', 'set_name', 'set_size', 'accuracy'])
 
         counter = 0
         with open(output, 'a') as f:
@@ -91,44 +103,46 @@ class Reporter(object):
 
             for i in xrange(n_individuals):
                 for j in xrange(n_sets):
-                    writer.writerow([func.__name__, str(gen), str(i), self.set_names[j], str(accs[counter])])
+                    writer.writerow([func.__name__, self.fold, str(gen), str(i), self.set_names[j], self.set_sizes[j], str(accs[counter])])
                     counter += 1
 
         # control access to file
-        del checkpoint[self.get_hash(func, gen)]
+        checkpoint = self.__check_out__(func, checkpoint)
+
+    def __save__(self, output_path, date, func, population, checkpoint):
+        checkpoint = self.__check_in__(func, checkpoint)
+
+        if func.__name__ == generate.__name__:
+            dense = np.array(map(lambda x: x.tolist(), population))
+        elif func.__name__ == integrate.__name__:
+            dense = np.array(map(lambda x: x.ravel(), population))
+        else:
+            dense = population
+
+        pd.DataFrame(dense).to_csv(
+            os.path.join(output_path, date + '_' + 'population' + '_' + func.__name__ + '.csv'),
+            sep=',',
+            index=False,
+            header=False
+        )
+
+        checkpoint = self.__check_out__(func, checkpoint)
 
     def save_population(self, func, population, gen=1, save_every=1):
-        def __save__(_output_path, _date, _func, _population, checkpoint):
-            while len(checkpoint) > 0:
-                time.sleep(30)
-            checkpoint[self.get_hash(func, gen)] = 1
-
-            if func.__name__ == generate.__name__:
-                dense = np.array(map(lambda x: x.tolist(), _population))
-            elif func.__name__ == integrate.__name__:
-                dense = np.array(map(lambda x: x.ravel(), _population))
-            else:
-                dense = _population
-
-            pd.DataFrame(dense).to_csv(
-                os.path.join(_output_path, _date + '_' + 'population' + '_' + _func.__name__ + '.csv'),
-                sep=',',
-                index=False,
-                header=False
-            )
-
-            del checkpoint[self.get_hash(func, gen)]
-
         if (gen > 0) and (gen % save_every == 0):
-            # __save__(self.output_path, self.date, func, population, dict())
+            # self.__save__(self.output_path, self.date, func, population, dict())
             p = Process(
-                target=__save__,
+                target=self.__save__,
                 args=(self.output_path, self.date, func, population, self.save_dict)
             )
             self.processes += [p]
             p.start()
 
     def join_all(self):
+        """
+        Join all running processes.
+        """
+
         for p in self.processes:
             p.join()
 
@@ -197,7 +211,8 @@ if __name__ == '__main__':
         Xs=[X_train, X_val, X_test],
         ys=[y_train, y_val, y_test],
         set_names=['train', 'val', 'test'],
-        output_path=params['reporter_output']
+        output_path=params['reporter_output'],
+        fold=1
     )
 
     preds = eel(metaparams, X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)

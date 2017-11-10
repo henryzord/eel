@@ -96,7 +96,7 @@ def integrate(
         fit = population[selected]
         loc = np.mean(fit, axis=0)
 
-        reporter.save_population(integrate, population)
+    reporter.save_population(integrate, population)
 
     median = np.median(fitness)
     selected = np.flatnonzero(fitness > median)

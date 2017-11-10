@@ -5,18 +5,18 @@
   "reporter_output": "/home/henry/Projects/eel/metadata",
   "metaparams": {
     "generation": {
-      "n_individuals": 10,
-      "n_generations": 1,
+      "n_individuals": 100,
+      "n_generations": 10,
       "verbose": true
     },
     "selection": {
-      "n_individuals": 10,
-      "n_generations": 1,
+      "n_individuals": 100,
+      "n_generations": 10,
       "verbose": true
     },
     "integration": {
-      "n_individuals": 10,
-      "n_generations": 1,
+      "n_individuals": 100,
+      "n_generations": 10,
       "verbose": true
     }
   }
