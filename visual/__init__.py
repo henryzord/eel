@@ -1,47 +1,48 @@
-import plotly.graph_objs as go
-import plotly.offline as off
-import time
-import numpy as np
-import pandas as pd
+import itertools as it
 import os
 
+import numpy as np
+import pandas as pd
+import plotly.graph_objs as go
+import plotly.offline as off
 from matplotlib import cm
 
 
 def __plot__(data, df):
     set_names = df['set_name'].unique()
-    colors = cm.viridis(np.linspace(0., 1., num=len(set_names)))
+
     for i, set_name in enumerate(set_names):
-        _set = df.loc[df['set_name'] == set_name]
+        _subset = df.loc[df['set_name'] == set_name]
+        gb = _subset.groupby(by=['method', 'generation', 'set_name', 'set_size']).aggregate([np.mean, np.std])
 
-        gb = _set.groupby(by=['method', 'fold', 'generation', 'set_name', 'set_size'])  # type: pd.core.groupby.GroupBy
-
-        acc = gb['accuracy'].agg([np.mean, np.std])
+        acc = gb['accuracy']
 
         y = acc['mean']
         _std = np.nan_to_num(acc['std'])
-        y_lower = list(acc['mean'] - _std)
-        y_upper = list(acc['mean'] + _std)
-        x = range(len(y))
+        y_lower = y - _std
+        y_upper = y + _std
 
-        # Create a trace
-        colors[i][-1] = 0.2
-        rgba_std = 'rgba(?)'.replace('?', ','.join(map(str, colors[i])))
-        colors[i][-1] = 1.
-        rgba_mean = 'rgba(?)'.replace('?', ','.join(map(str, colors[i])))
+        x = np.arange(len(y))
 
-        # TODO here!
-        data[set_name] += [trace_std, trace_mean]
+        data[set_name]['y_lower'] = y_lower
+        data[set_name]['y_upper'] = y_upper
+        data[set_name]['x'] = x
+        data[set_name]['y_mean'] = y
+        data[set_name]['size'] = len(y)
+
     return data
 
 
 def main():
-
     off.init_notebook_mode()
     output_name = 'out.html'
     path_read = '/home/henry/Projects/eel/metadata'
 
     # TODO must support absence of some reports, or even incompletude!
+
+    generate_df = pd.DataFrame([])
+    select_df = pd.DataFrame([])
+    integrate_df = pd.DataFrame([])
 
     files = os.listdir(path_read)
     for _file in files:
@@ -52,59 +53,136 @@ def main():
         elif '_eda_select' in _file:
             select_df = pd.read_csv(os.path.join(path_read, _file), sep=',')
 
-    data = dict(
-        x=[],
-        y_mean=[],
-        y_lower=[],
-        y_upper=[]
+    step_names = filter(
+        None,
+        [bool(len(generate_df) > 0) * 'generate',
+        bool(len(select_df) > 0) * 'select',
+        bool(len(integrate_df) > 0) * 'integrate']
     )
+
+    set_names = []
+    for df in [generate_df, select_df, integrate_df]:
+        try:
+            set_names.extend(np.unique(df['set_name']))
+        except KeyError:
+            pass
+
+    set_names = np.unique(set_names)
+
+    colors = cm.viridis(np.linspace(0., 1., num=len(set_names) + 1))
+
+    overall = {
+        step_name: {
+            set_name: dict(
+                x=[],
+                y_mean=[],
+                y_lower=[],
+                y_upper=[],
+                color_std='rgba(?)'.replace('?', ','.join(map(str, list(colors[i][:-1]) + [0.2]))),
+                color_mean='rgba(?)'.replace('?', ','.join(map(str, list(colors[i][:-1]) + [1.0]))),
+                size=[]
+            ) for i, set_name in enumerate(set_names)
+        } for step_name in ['generate', 'select', 'integrate']
+    }
+
     # TODO plot!
-    # data = __plot__(data, generate_df)
-    # data = __plot__(data, select_df)
-    data = __plot__(data, integrate_df)
+    overall['generate'] = __plot__(overall['generate'], generate_df)
+    overall['select'] = __plot__(overall['select'], select_df)
+    overall['integrate'] = __plot__(overall['integrate'], integrate_df)
 
-    trace_mean = go.Scatter(
-        x=x,  # appends
-        y=y,  # appends
-        line=go.Line(color=rgba_mean),
-        mode='lines',
-        showlegend=True,
-        name=set_name,
-    )
+    traces = []
+    shapes = []
+    annotations = []
 
-    trace_std = go.Scatter(
-        x=x + x[::-1],  # appends
-        y=y_upper + y_lower[::-1],  # appends
-        fill='tozerox',
-        fillcolor=rgba_std,
-        line=go.Line(color=rgba_std),
-        showlegend=False,
-    )
+    _global_lower = np.inf
+    _global_upper = -np.inf
 
-    layout = go.Layout(
-        paper_bgcolor='rgb(255,255,255)',
-        plot_bgcolor='rgb(229,229,229)',
-        xaxis=go.XAxis(
-            gridcolor='rgb(255,255,255)',
-            range=[1, 10],
-            showgrid=True,
-            showline=False,
-            showticklabels=True,
-            tickcolor='rgb(127,127,127)',
-            ticks='outside',
-            zeroline=False
+    for data in overall.values():
+        _lower_bound = min([
+            min(data[set_name]['y_lower']) for set_name in set_names
+        ])
+        _upper_bound = max([
+            max(data[set_name]['y_upper']) for set_name in set_names
+        ])
+
+        _global_lower = min(_lower_bound, _global_lower)
+        _global_upper = max(_upper_bound, _global_upper)
+
+    last_x = 0
+
+    for step_name, bkg_color in it.izip(step_names, [256, 32, 256]):
+        data = overall[step_name]
+        
+        for set_name in set_names:
+            traces += [go.Scatter(
+                x=last_x + data[set_name]['x'],
+                y=data[set_name]['y_mean'],
+                line=go.Line(color=data[set_name]['color_mean']),
+                mode='lines',
+                showlegend=True,
+                name=step_name + ' ' + set_name,
+            )]
+
+            # TODO generate only one std trace!!!
+            # TODO generate only one std trace!!!
+
+            traces += [go.Scatter(
+                x=list(last_x + data[set_name]['x']) + list(last_x + data[set_name]['x'])[::-1],  # appends
+                y=list(data[set_name]['y_upper']) + list(data[set_name]['y_lower'])[::-1],  # appends
+                fill='toself',
+                fillcolor=data[set_name]['color_std'],
+                line=go.Line(color=data[set_name]['color_std']),
+                showlegend=False,
+                hoverinfo='skip',
+                name=None
+            )]
+
+        size = data[set_names[0]]['size'] - 1
+
+        annotations += [
+            dict(
+                x=(last_x + (last_x + size)) / 2.,
+                y=(_global_upper + _global_lower) / 2.,
+                xref='x',
+                yref='y',
+                showarrow=False,
+                text=step_name,
+                # ax=0,
+                # ay=-40
+            )
+        ]
+
+        shapes += [
+            {
+                'type': 'rect',
+                'y0': _global_lower,
+                'y1': _global_upper,
+                'x0': last_x,
+                'x1': last_x + size,
+                'line': {
+                    'color': 'rgba(%f, %f, %f, 0.0)' % (bkg_color, bkg_color, bkg_color),
+                },
+                'fillcolor': 'rgba(%f, %f, %f, 0.1)' % (bkg_color, bkg_color, bkg_color),
+            },
+        ]
+        last_x += size
+
+    layout = dict(
+        shapes=shapes,
+        title='Accuracy in sets',
+        xaxis=dict(
+            title='Generation',
         ),
-        yaxis=go.YAxis(
-            gridcolor='rgb(255,255,255)',
-            showgrid=True,
-            showline=False,
-            showticklabels=True,
-            tickcolor='rgb(127,127,127)',
-            ticks='outside',
-            zeroline=False
+        yaxis=dict(
+            title='Accuracy',
         ),
+        annotations=annotations
     )
-    fig = go.Figure(data=data, layout=layout)
+
+    fig = go.Figure(
+        data=traces,
+        layout=layout
+    )
     off.plot(fig, filename=output_name)
 
 
@@ -122,5 +200,3 @@ if __name__ == '__main__':
 #     filename=output_name,
 #     auto_open=True
 # )
-
-

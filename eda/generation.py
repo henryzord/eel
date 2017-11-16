@@ -151,16 +151,22 @@ def generate(
         t2 = dt.now()
 
         # TODO fulfill!
-        reporter.callback(generate, g, dummy_weight_vector, ConversorIterator(population), classifiers)
-        reporter.save_population(generate, population, g, save_every)
+        try:
+            reporter.callback(generate, g, dummy_weight_vector, ConversorIterator(population), classifiers)
+            reporter.save_population(generate, population, g, save_every)
+        except AttributeError:
+            pass
 
-        print 'generation %d: ens val acc: %.2f median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
+        print 'generation %2.d: ens val acc: %.2f median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
             g, ensemble_acc, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
         )
         t1 = t2
         g += 1
 
-    reporter.save_population(generate, population)
+    try:
+        reporter.save_population(generate, population)
+    except AttributeError:
+        pass
 
     dense = np.array(map(lambda x: x.tolist(), population))
     return classifiers, dense, fitness

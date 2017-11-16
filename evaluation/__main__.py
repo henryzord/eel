@@ -6,8 +6,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
-from eda import eel
+from eda import eel, Reporter
 from eda.dataset import path_to_dataframe
+from datetime import datetime as dt
 
 
 def main():
@@ -30,42 +31,58 @@ def main():
     n_all = X.shape[0]
 
     skf = StratifiedKFold(n_splits=params['n_folds'], shuffle=True, random_state=params['random_state'])
+
+    date = dt.now()
+
     for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-        X_train_val = X.iloc[train_index]
-        X_test = X.iloc[test_index]
+        for run in xrange(params['n_runs']):
 
-        y_train_val = y.iloc[train_index]
-        y_test = y.iloc[test_index]
+            X_train_val = X.iloc[train_index]
+            X_test = X.iloc[test_index]
 
-        X_train, X_val, y_train, y_val = train_test_split(
-            X_train_val, y_train_val,
-            train_size=0.5, random_state=params['random_state']
-        )
+            y_train_val = y.iloc[train_index]
+            y_test = y.iloc[test_index]
 
-        n_test = X_test.shape[0]
+            X_train, X_val, y_train, y_val = train_test_split(
+                X_train_val, y_train_val,
+                train_size=0.5, random_state=params['random_state']
+            )
 
-        adaboost = AdaBoostClassifier()
-        randomforest = RandomForestClassifier()
+            # reporter = Reporter(
+            #     Xs=[X_train, X_val, X_test],
+            #     ys=[y_train, y_val, y_test],
+            #     set_names=['train', 'val', 'test'],
+            #     output_path=params['reporter_output'],
+            #     date=date,
+            #     fold=fold,
+            #     n_run=run
+            # )
+            reporter = None  # TODO change back!
 
-        adaboost = adaboost.fit(X_train_val, y_train_val)  # type: AdaBoostClassifier
-        randomforest = randomforest.fit(X_train_val, y_train_val)  # type: RandomForestClassifier
+            n_test = X_test.shape[0]
 
-        preds_adaboost = adaboost.predict(X_test)
-        preds_randomforest = randomforest.predict(X_test)
-        preds_eel = eel(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test)
+            adaboost = AdaBoostClassifier()
+            randomforest = RandomForestClassifier()
 
-        acc_adaboost += [accuracy_score(y_test, preds_adaboost) * (float(n_test) / n_all)]
-        acc_randomforest += [accuracy_score(y_test, preds_randomforest) * (float(n_test) / n_all)]
-        acc_eel += [accuracy_score(y_test, preds_eel) * (float(n_test) / n_all)]
+            adaboost = adaboost.fit(X_train_val, y_train_val)  # type: AdaBoostClassifier
+            randomforest = randomforest.fit(X_train_val, y_train_val)  # type: RandomForestClassifier
 
-        print '----------------------------------'
-        print 'partition accuracies:'
-        print '----------------------------------'
-        print '\tadaboost accuracy: %.4f' % acc_adaboost[-1]
-        print '\trandomForest accuracy: %.4f' % acc_randomforest[-1]
-        print '\teel accuracy: %.4f' % acc_eel[-1]
-        print '----------------------------------'
-        print '----------------------------------'
+            preds_adaboost = adaboost.predict(X_test)
+            preds_randomforest = randomforest.predict(X_test)
+            preds_eel = eel(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
+
+            acc_adaboost += [accuracy_score(y_test, preds_adaboost) * (float(n_test) / n_all)]
+            acc_randomforest += [accuracy_score(y_test, preds_randomforest) * (float(n_test) / n_all)]
+            acc_eel += [accuracy_score(y_test, preds_eel) * (float(n_test) / n_all)]
+
+            print '----------------------------------'
+            print 'partition accuracies:'
+            print '----------------------------------'
+            print '\tadaboost accuracy: %.4f' % acc_adaboost[-1]
+            print '\trandomForest accuracy: %.4f' % acc_randomforest[-1]
+            print '\teel accuracy: %.4f' % acc_eel[-1]
+            print '----------------------------------'
+            print '----------------------------------'
 
     print 'adaboost accuracy: %.4f' % sum(acc_adaboost)
     print 'randomForest accuracy: %.4f' % sum(acc_randomforest)

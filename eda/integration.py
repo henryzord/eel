@@ -74,8 +74,11 @@ def integrate(
             y_val_pred = get_classes(population[i], val_predictions)
             fitness[i] = accuracy_score(y_val, y_val_pred)
 
-        reporter.callback(integrate, g, population, features, classifiers)
-        reporter.save_population(integrate, population, g, save_every)
+        try:
+            reporter.callback(integrate, g, population, features, classifiers)
+            reporter.save_population(integrate, population, g, save_every)
+        except AttributeError:
+            pass
 
         # update
         median = np.median(fitness)
@@ -96,7 +99,10 @@ def integrate(
         fit = population[selected]
         loc = np.mean(fit, axis=0)
 
-    reporter.save_population(integrate, population)
+    try:
+        reporter.save_population(integrate, population)
+    except AttributeError:
+        pass
 
     median = np.median(fitness)
     selected = np.flatnonzero(fitness > median)

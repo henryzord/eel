@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
 
-from eda.core import load_population, get_classes, DummyIterator
+from eda.core import load_population, get_classes, DummyIterator, get_fronts
 from core import check_distribution, __pareto_encode_gm__
 from datetime import datetime as dt
 
@@ -121,12 +121,16 @@ def eda_select(
 
             fitness[i, :] = get_selection_fitness(val_predictions[sel_pop[i]], y_val)
 
-        reporter.callback(eda_select, g, dummy_weights, features, classifiers)
-        reporter.save_population(eda_select, sel_pop, g, save_every)
+        try:
+            reporter.callback(eda_select, g, dummy_weights, features, classifiers)
+            reporter.save_population(eda_select, sel_pop, g, save_every)
+        except AttributeError:
+            pass
 
         medians = np.median(fitness, axis=0)
         means = np.mean(fitness, axis=0)
 
+        # individuals with fitness equal or higher than median
         selected = np.multiply.reduce(fitness >= medians, axis=1)
 
         if np.count_nonzero(selected) == 0:
@@ -142,9 +146,14 @@ def eda_select(
 
         gm = __pareto_encode_gm__(sel_pop, fitness)
 
-    medians = np.median(fitness, axis=0)
-    selected = np.multiply.reduce(fitness >= medians, axis=1)
+    # medians = np.median(fitness, axis=0)
+    # selected = np.multiply.reduce(fitness >= medians, axis=1)
 
-    reporter.save_population(eda_select, sel_pop)
+    fronts = get_fronts(fitness)
+    try:
+        reporter.save_population(eda_select, sel_pop)
+    except AttributeError:
+        pass
 
-    return selected
+    # first individual from first front, which is the most sparse in comparison to other individuals
+    return fronts[0][0]

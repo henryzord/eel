@@ -20,15 +20,22 @@ from pathlib2 import Path
 from generation import generate
 from selection import eda_select
 from integration import integrate
+import datetime
 
 
 class Reporter(object):
-    def __init__(self, Xs, ys, set_names, output_path, fold, n_jobs=4):
+    def __init__(self, Xs, ys, set_names, fold, n_run, output_path, date=None, n_jobs=4):
         self.Xs = Xs
         self.ys = ys
         self.set_sizes = map(len, self.ys)
         self.set_names = set_names
-        self.date = str(dt.now())
+        if date is None:
+            self.date = str(dt.now())
+        else:
+            if isinstance(date, datetime.datetime):
+                date = str(date)
+            self.date = date
+        self.run = n_run
         self.output_path = output_path
         self.manager = Manager()
         self.report_dict = self.manager.dict()
@@ -61,15 +68,15 @@ class Reporter(object):
         return checkpoint
 
     def callback(self, func, gen, weights, features, classifiers):
-        # self.__report__(func, gen, weights, features, classifiers, dict())
+        self.__report__(func, gen, weights, features, classifiers, dict())
 
-        p = Process(
-            target=self.__report__, args=(
-                func, gen, weights, features, classifiers, self.report_dict
-            )
-        )
-        self.processes += [p]
-        p.start()
+        # p = Process(
+        #     target=self.__report__, args=(
+        #         func, gen, weights, features, classifiers, self.report_dict
+        #     )
+        # )
+        # self.processes += [p]
+        # p.start()
 
     def __report__(self, func, gen, weights, features, classifiers, checkpoint):
         n_sets = len(self.Xs)
@@ -95,7 +102,7 @@ class Reporter(object):
         if not pth.exists():
             with open(output, 'w') as f:
                 writer = csv.writer(f, delimiter=',')
-                writer.writerow(['method', 'fold', 'generation', 'individual', 'set_name', 'set_size', 'accuracy'])
+                writer.writerow(['method', 'fold', 'run', 'generation', 'individual', 'set_name', 'set_size', 'accuracy'])
 
         counter = 0
         with open(output, 'a') as f:
@@ -103,7 +110,7 @@ class Reporter(object):
 
             for i in xrange(n_individuals):
                 for j in xrange(n_sets):
-                    writer.writerow([func.__name__, self.fold, str(gen), str(i), self.set_names[j], self.set_sizes[j], str(accs[counter])])
+                    writer.writerow([func.__name__, self.fold, self.run, str(gen), str(i), self.set_names[j], self.set_sizes[j], str(accs[counter])])
                     counter += 1
 
         # control access to file
@@ -130,13 +137,13 @@ class Reporter(object):
 
     def save_population(self, func, population, gen=1, save_every=1):
         if (gen > 0) and (gen % save_every == 0):
-            # self.__save__(self.output_path, self.date, func, population, dict())
-            p = Process(
-                target=self.__save__,
-                args=(self.output_path, self.date, func, population, self.save_dict)
-            )
-            self.processes += [p]
-            p.start()
+            self.__save__(self.output_path, self.date, func, population, dict())
+            # p = Process(
+            #     target=self.__save__,
+            #     args=(self.output_path, self.date, func, population, self.save_dict)
+            # )
+            # self.processes += [p]
+            # p.start()
 
     def join_all(self):
         """

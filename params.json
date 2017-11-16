@@ -1,22 +1,23 @@
 {
   "full_path": "/home/henry/Projects/eel/datasets/ionosphere/ionosphere_full.arff",
   "random_state": 0,
-  "n_folds": 10,
+  "n_folds": 3,
   "reporter_output": "/home/henry/Projects/eel/metadata",
+  "n_runs": 2,
   "metaparams": {
     "generation": {
       "n_individuals": 100,
-      "n_generations": 10,
+      "n_generations": 11,
       "verbose": true
     },
     "selection": {
       "n_individuals": 100,
-      "n_generations": 10,
+      "n_generations": 12,
       "verbose": true
     },
     "integration": {
       "n_individuals": 100,
-      "n_generations": 10,
+      "n_generations": 13,
       "verbose": true
     }
   }
