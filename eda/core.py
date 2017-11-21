@@ -118,16 +118,28 @@ def load_population(base_classifier, population, X_train, y_train, X_val, y_val,
 
 
 def __get_classifier__(clf, selected_features, X_train, y_train, X_val):
+    """
+    :param clf:
+    :param selected_features: Only the features selected for the given classifier
+    :param X_train:
+    :param y_train:
+    :param X_val:
+    :rtype: tuple
+    :return: model, preds
+    """
+
+    assert isinstance(X_train, pd.DataFrame), TypeError('X_train must be a pandas.DataFrame!')
+    assert isinstance(X_val, pd.DataFrame), TypeError('X_val must be a pandas.DataFrame!')
+
     model = clf(random_state=0)
 
     classes = np.unique(y_train)
 
-    try:
+    if len(selected_features) <= 0:
+        preds = np.ones(X_train.shape[0]) * -1
+    else:
         model = model.fit(X_train[selected_features], y_train)
         preds = model.predict(X_val[selected_features])
-
-    except ValueError:  # train set is empty
-        preds = np.random.choice(classes, replace=True, size=X_train.shape[0])
 
     return model, preds
 
@@ -259,3 +271,43 @@ def get_fronts(pop):
         cur_front += 1
 
     return fronts
+
+
+def distinct_failure_diversity(predictions, y_true):
+    """
+    Imlements distinct failure diversity. See
+        Derek Partridge & Wo jtek Krzanowski. Distinct Failure Diversity in Multiversion Software. 1997
+        for more information.
+
+    :type predictions: numpy.ndarray
+    :param predictions:
+    :type y_true: pandas.Series
+    :param y_true:
+    :return:
+    """
+    if isinstance(predictions, pd.DataFrame):
+        predictions = predictions.values
+
+    if isinstance(y_true, pd.Series):
+        y_true = y_true.tolist()
+
+    n_classifiers, n_instances = predictions.shape
+    distinct_failures = np.zeros(n_classifiers + 1, dtype=np.float32)
+
+    for i in xrange(n_instances):
+        truth = y_true[i]
+        count = Counter(predictions[:, i])
+        for cls, n_votes in count.items():
+            if cls != truth:
+                distinct_failures[n_votes] += 1
+
+    distinct_failures_count = np.sum(distinct_failures)  # type: int
+
+    dfd = 0.
+
+    if (distinct_failures_count > 0) and (n_classifiers > 1):
+        for j in xrange(1, n_classifiers + 1):
+            dfd += (float(n_classifiers - j)/float(n_classifiers - 1)) * \
+                   (float(distinct_failures[j]) / distinct_failures_count)
+
+    return dfd

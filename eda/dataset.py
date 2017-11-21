@@ -50,6 +50,16 @@ def path_to_dataframe(path):
 
 
 def path_to_sets(path, train_size=0.5, val_size=0.25, test_size=0.25, random_state=None):
+    """
+
+    :param path:
+    :param train_size:
+    :param val_size:
+    :param test_size:
+    :param random_state:
+    :return: X_train, y_train, X_val, y_val, X_test, y_test
+    """
+
     full_df = path_to_dataframe(path)
 
     y_name = full_df.columns[-1]

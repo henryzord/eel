@@ -1,4 +1,5 @@
 import json
+import warnings
 from datetime import datetime as dt
 from multiprocessing import Process
 
@@ -8,7 +9,7 @@ from bitarray import bitarray
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
 
-from core import check_distribution, __pareto_encode_gm__, get_classes
+from core import check_distribution, __pareto_encode_gm__, get_classes, distinct_failure_diversity
 from eda import path_to_sets
 from eda.core import __get_classifier__, DummyIterator
 
@@ -46,7 +47,7 @@ class ConversorIterator(object):
             raise StopIteration
 
 
-def get_fitness(ensemble, fitness, predictions, y_val):
+def get_generation_fitness(ensemble, fitness, val_predictions, y_val):
     """
 
     First objective is accuracy. Second objective is double-fault.
@@ -63,13 +64,13 @@ def get_fitness(ensemble, fitness, predictions, y_val):
     pairwise_double_fault = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
 
     for i in xrange(n_classifiers):
-        fitness[i, 0] = accuracy_score(y_val, predictions[i, :])
+        fitness[i, 0] = accuracy_score(y_val, val_predictions[i, :])
 
         for j in xrange(i, n_classifiers):
             # index = np.sum(np.logical_or(
             index = np.sum(np.logical_xor(
-                predictions[i] == y_val,
-                predictions[j] == y_val
+                val_predictions[i] == y_val,
+                val_predictions[j] == y_val
             )) / float(n_instances_val)
 
             pairwise_double_fault[i, j] = index
@@ -114,14 +115,14 @@ def generate(
 
     n_instances_val = X_val.shape[0]
 
-    initial_prob = 0.5
+    initial_prob = 0.75
     gm = np.full(shape=n_features, fill_value=initial_prob, dtype=np.float32)
 
     classifiers = np.empty(n_classifiers, dtype=np.object)
 
     # first column for accuracy, second for scalar double fault
     fitness = np.empty((n_classifiers, n_objectives), dtype=np.float32)
-    predictions = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
+    val_preds = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
 
     # population
     population = [bitarray(n_features) for i in xrange(n_classifiers)]
@@ -135,14 +136,15 @@ def generate(
                 population[j][k] = np.random.choice(a=[0, 1], p=[1. - gm[k], gm[k]])
 
             selected_features = X_features[list(population[j])]
-            classifiers[j], predictions[j] = __get_classifier__(
+            classifiers[j], val_preds[j] = __get_classifier__(
                 base_classifier, selected_features, X_train, y_train, X_val
             )
 
-        ensemble_preds = get_classes(dummy_weights, predictions)
+        ensemble_preds = get_classes(dummy_weights, val_preds)
+        dfd = distinct_failure_diversity(val_preds, y_val)
         ensemble_acc = accuracy_score(y_val, ensemble_preds)
 
-        fitness = get_fitness(classifiers, fitness, predictions, y_val)
+        fitness = get_generation_fitness(classifiers, fitness, val_preds, y_val)
         medians = np.median(fitness, axis=0)
         means = np.mean(fitness, axis=0)
 
@@ -150,15 +152,15 @@ def generate(
 
         t2 = dt.now()
 
-        # TODO fulfill!
         try:
-            reporter.callback(generate, g, dummy_weight_vector, ConversorIterator(population), classifiers)
+            reporter.save_accuracy(generate, g, dummy_weight_vector, ConversorIterator(population), classifiers)
             reporter.save_population(generate, population, g, save_every)
+            reporter.save_gm(generate, g, gm)
         except AttributeError:
             pass
 
-        print 'generation %2.d: ens val acc: %.2f median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
-            g, ensemble_acc, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
+        print 'generation %2.d: ens val acc: %.2f dfd: %.4f median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
+            g, ensemble_acc, dfd, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
         )
         t1 = t2
         g += 1

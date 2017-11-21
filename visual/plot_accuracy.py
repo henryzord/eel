@@ -35,10 +35,8 @@ def __plot__(data, df):
 
 def main():
     off.init_notebook_mode()
-    output_name = 'out.html'
+    output_name = 'accuracy.html'
     path_read = '/home/henry/Projects/eel/metadata'
-
-    # TODO must support absence of some reports, or even incompletude!
 
     generate_df = pd.DataFrame([])
     select_df = pd.DataFrame([])
@@ -85,10 +83,18 @@ def main():
         } for step_name in ['generate', 'select', 'integrate']
     }
 
-    # TODO plot!
-    overall['generate'] = __plot__(overall['generate'], generate_df)
-    overall['select'] = __plot__(overall['select'], select_df)
-    overall['integrate'] = __plot__(overall['integrate'], integrate_df)
+    if 'generate' in step_names:
+        overall['generate'] = __plot__(overall['generate'], generate_df)
+    else:
+        del overall['generate']
+    if 'select' in step_names:
+        overall['select'] = __plot__(overall['select'], select_df)
+    else:
+        del overall['select']
+    if 'integrate' in step_names:
+        overall['integrate'] = __plot__(overall['integrate'], integrate_df)
+    else:
+        del overall['integrate']
 
     traces = []
     shapes = []
@@ -97,7 +103,7 @@ def main():
     _global_lower = np.inf
     _global_upper = -np.inf
 
-    for data in overall.values():
+    for key, data in overall.items():
         _lower_bound = min([
             min(data[set_name]['y_lower']) for set_name in set_names
         ])
@@ -122,9 +128,6 @@ def main():
                 showlegend=True,
                 name=step_name + ' ' + set_name,
             )]
-
-            # TODO generate only one std trace!!!
-            # TODO generate only one std trace!!!
 
             traces += [go.Scatter(
                 x=list(last_x + data[set_name]['x']) + list(last_x + data[set_name]['x'])[::-1],  # appends
@@ -188,15 +191,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-# off.plot(
-#     dict(
-#         data=data,
-#         layout={
-#             'title': 'Accuracy on sets throughout evolution',
-#             'font': dict(size=16)
-#         },
-#     ),
-#     filename=output_name,
-#     auto_open=True
-# )

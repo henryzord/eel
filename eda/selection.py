@@ -1,55 +1,11 @@
-import json
 from collections import Counter
-from multiprocessing import Process
-
-import numpy as np
-import pandas as pd
-from sklearn.metrics import accuracy_score
-from sklearn.tree import DecisionTreeClassifier as clf
-
-from eda.core import load_population, get_classes, DummyIterator, get_fronts
-from core import check_distribution, __pareto_encode_gm__
 from datetime import datetime as dt
 
+import numpy as np
+from sklearn.metrics import accuracy_score
 
-def distinct_failure_diversity(predictions, y_true):
-    """
-    Imlements distinct failure diversity. See
-        Derek Partridge & Wo jtek Krzanowski. Distinct Failure Diversity in Multiversion Software. 1997
-        for more information.
-
-    :type predictions: numpy.ndarray
-    :param predictions:
-    :type y_true: pandas.Series
-    :param y_true:
-    :return:
-    """
-    if isinstance(predictions, pd.DataFrame):
-        predictions = predictions.values
-
-    if isinstance(y_true, pd.Series):
-        y_true = y_true.tolist()
-
-    n_classifiers, n_instances = predictions.shape
-    distinct_failures = np.zeros(n_classifiers + 1, dtype=np.float32)
-
-    for i in xrange(n_instances):
-        truth = y_true[i]
-        count = Counter(predictions[:, i])
-        for cls, n_votes in count.items():
-            if cls != truth:
-                distinct_failures[n_votes] += 1
-
-    distinct_failures_count = np.sum(distinct_failures)  # type: int
-
-    dfd = 0.
-
-    if (distinct_failures_count > 0) and (n_classifiers > 1):
-        for j in xrange(1, n_classifiers + 1):
-            dfd += (float(n_classifiers - j)/float(n_classifiers - 1)) * \
-                   (float(distinct_failures[j]) / distinct_failures_count)
-
-    return dfd
+from core import check_distribution, __pareto_encode_gm__
+from eda.core import get_fronts, distinct_failure_diversity
 
 
 def simple_select(ensemble, population, predictions, X_val, y_val):
@@ -122,7 +78,7 @@ def eda_select(
             fitness[i, :] = get_selection_fitness(val_predictions[sel_pop[i]], y_val)
 
         try:
-            reporter.callback(eda_select, g, dummy_weights, features, classifiers)
+            reporter.save_accuracy(eda_select, g, dummy_weights, features, classifiers)
             reporter.save_population(eda_select, sel_pop, g, save_every)
         except AttributeError:
             pass

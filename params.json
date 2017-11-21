@@ -3,21 +3,22 @@
   "random_state": 0,
   "n_folds": 3,
   "reporter_output": "/home/henry/Projects/eel/metadata",
-  "n_runs": 2,
+  "n_runs": 5,
+  "max_depth": 10,
   "metaparams": {
     "generation": {
       "n_individuals": 100,
-      "n_generations": 11,
+      "n_generations": 10,
       "verbose": true
     },
     "selection": {
-      "n_individuals": 100,
-      "n_generations": 12,
+      "n_individuals": 10,
+      "n_generations": 0,
       "verbose": true
     },
     "integration": {
-      "n_individuals": 100,
-      "n_generations": 13,
+      "n_individuals": 10,
+      "n_generations": 0,
       "verbose": true
     }
   }

@@ -1,12 +1,14 @@
 import json
+import warnings
 from datetime import datetime as dt
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
+from eda.dataset import path_to_sets
 
-from eda.core import load_population, get_classes
+from eda.core import load_population, get_classes, __get_classifier__
 
 
 def __ensemble_predict_matrix__(voting_weights, predictions):
@@ -49,8 +51,6 @@ def integrate(
     classes = np.unique(y_val)
     n_classes = len(classes)
 
-    n_objectives = 2
-
     n_classifiers, n_val_instances = val_predictions.shape
 
     population = np.empty((n_individuals, n_classifiers, n_classes), dtype=np.float32)
@@ -75,7 +75,7 @@ def integrate(
             fitness[i] = accuracy_score(y_val, y_val_pred)
 
         try:
-            reporter.callback(integrate, g, population, features, classifiers)
+            reporter.save_accuracy(integrate, g, population, features, classifiers)
             reporter.save_population(integrate, population, g, save_every)
         except AttributeError:
             pass
@@ -104,12 +104,38 @@ def integrate(
     except AttributeError:
         pass
 
-    median = np.median(fitness)
-    selected = np.flatnonzero(fitness > median)
-    try:
-        best_weights = population[selected[0], :, :]
-    except IndexError:
-        selected = np.flatnonzero(fitness >= median)
-        best_weights = population[selected[0], :, :]
+    return population[np.argmax(fitness)]
 
-    return best_weights
+
+def main():
+    X_train, y_train, X_val, y_val, X_test, y_test = path_to_sets(
+        '/home/henry/Projects/eel/datasets/ionosphere/ionosphere_full.arff',
+        train_size=0.5, val_size=0.25, test_size=0.25, random_state=None
+    )
+
+    gen_file = pd.read_csv(
+        '/home/henry/Projects/eel/metadata/2017-11-17 13:08:02.243386_population_generate.csv', dtype=np.bool
+    )
+
+    gen_pop = []
+    features = []
+    for i in xrange(len(gen_file)):
+        features += [gen_file.iloc[i].values]
+        gen_pop += [__get_classifier__(clf, np.flatnonzero(features[i]), X_train, y_train, X_val)]
+
+    models, preds = zip(*gen_pop)
+    features, models, preds = np.array(features), np.array(models), np.array(preds)
+
+    sel_file = pd.read_csv(
+        '/home/henry/Projects/eel/metadata/2017-11-17 13:08:02.243386_population_eda_select.csv', dtype=np.bool
+    )
+
+    int_pop = integrate(
+        features, models, preds, y_val,
+        n_individuals=100, n_generations=100,
+        save_every=5, reporter=None
+    )
+
+
+if __name__ == '__main__':
+    main()
