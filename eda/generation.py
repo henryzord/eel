@@ -1,16 +1,11 @@
-import json
 import warnings
 from datetime import datetime as dt
-from multiprocessing import Process
 
 import numpy as np
-import pandas as pd
 from bitarray import bitarray
 from sklearn.metrics import accuracy_score
-from sklearn.tree import DecisionTreeClassifier as clf
 
-from core import check_distribution, __pareto_encode_gm__, get_classes, distinct_failure_diversity
-from eda import path_to_sets
+from core import __pareto_encode_gm__, get_classes, distinct_failure_diversity, get_fronts
 from eda.core import __get_classifier__, DummyIterator
 
 '''
@@ -115,7 +110,7 @@ def generate(
 
     n_instances_val = X_val.shape[0]
 
-    initial_prob = 0.75
+    initial_prob = 0.5
     gm = np.full(shape=n_features, fill_value=initial_prob, dtype=np.float32)
 
     classifiers = np.empty(n_classifiers, dtype=np.object)
@@ -171,4 +166,13 @@ def generate(
         pass
 
     dense = np.array(map(lambda x: x.tolist(), population))
-    return classifiers, dense, fitness
+
+    fronts = get_fronts(fitness)
+    flat_list = [item for sublist in fronts for item in sublist]
+
+    to_pick = []
+    for i, ind in enumerate(flat_list):
+        if i < (len(population) / 2):
+            to_pick += [ind]
+
+    return classifiers[to_pick], dense[to_pick], fitness[to_pick]

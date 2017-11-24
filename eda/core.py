@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import operator as op
 from collections import Counter
@@ -26,6 +28,16 @@ class DummyIterator(object):
             if self.reset:
                 self.current = 0
             raise StopIteration
+
+class DummyClassifier(object):
+    def __init__(self):
+        pass
+
+    def fit(self, X_train, y_train):
+        pass
+
+    def predict(self, X_test):
+        return np.ones(X_test.shape[0], dtype=np.int32) * -1
 
 
 def get_predictions(classifiers, features, X):
@@ -136,16 +148,20 @@ def __get_classifier__(clf, selected_features, X_train, y_train, X_val):
     classes = np.unique(y_train)
 
     if len(selected_features) <= 0:
-        preds = np.ones(X_train.shape[0]) * -1
+        model = DummyClassifier()
     else:
         model = model.fit(X_train[selected_features], y_train)
-        preds = model.predict(X_val[selected_features])
+    preds = model.predict(X_val[selected_features])
 
     return model, preds
 
 # ---------------------------------------------------#
 # ----------- # pareto-related methods # ----------- #
 # ---------------------------------------------------#
+
+
+def get_flat_list(fronts):
+    return [item for sublist in fronts for item in sublist]
 
 
 def __pareto_encode_gm__(population, fitness):
@@ -160,18 +176,47 @@ def __pareto_encode_gm__(population, fitness):
 
     # where first position is the first front, second position is the first front, and so on
     fronts = get_fronts(fitness)
+
+    # TODO must use optimized operator for selecting solutions!
+
     # compress list of lists in a single list of ordered individuals, based on their non-dominated rank
-    flat_list = [item for sublist in fronts for item in sublist]
+    flat_list = get_flat_list(fronts)
 
     # start picking individuals from these fronts
     for i, ind in enumerate(flat_list):
         # if any(np.array(fitness[ind]) < np.array(medians)):
         #     break
         if i < (len(population) / 2):
-            to_pick += [population[ind].tolist()]
+            to_pick += [list(population[ind])]
 
     gm = np.sum(to_pick, axis=0) / float(len(to_pick))
     return gm
+
+
+def pairwise_domination(P, Q=None):
+    """
+
+    :type P: numpy.ndarray
+    :param P: Population of individuals. If Q is not provided, it will calculate the pairwise domination among
+        P individuals.
+    :type Q: numpy.ndarray
+    :param Q: optional - second population of individuals. If provided, will calculate domination among P and Q
+        populations, in a way that in the cell D[i, j], for example, denotes the dominance of the i-th individual
+        of P over the j-th individual of Q.
+    :rtype: numpy.ndarray
+    :return: An matrix where each cell determines if the individual in that row
+        dominates the individual in that column, and vice-versa.
+    """
+
+    n_p_individuals, = P.shape
+    n_q_individuals, = Q.shape if Q is not None else P.shape
+
+    matrix = np.empty((n_p_individuals, n_q_individuals), dtype=np.int32)
+    for i in xrange(n_p_individuals):
+        for j in xrange(n_q_individuals):
+            matrix[i, j] = a_dominates_b(P[i], P[j])
+
+    return matrix
 
 
 def a_dominates_b(a, b):
@@ -181,8 +226,18 @@ def a_dominates_b(a, b):
     :param b: list of performance in the n objective functions of individual b
     :return: -1 if b dominates a, +1 if the opposite, and 0 if there is no dominance
     """
-    a_dominates = any(a > b) and all(a >= b)
-    b_dominates = any(b > a) and all(b >= a)
+    assert type(a) == type(b), TypeError('a and b must have the same type!')
+    assert type(a) in [np.void, np.ndarray, list], TypeError('invalid type for a and b! Must be either lists or void objects!')
+
+    if isinstance(a, np.void):
+        newa = [a[name] for name in a.dtype.names]
+        newb = [b[name] for name in b.dtype.names]
+    else:
+        newa = a
+        newb = b
+
+    a_dominates = np.any(newa > newb) and np.all(newa >= newb)
+    b_dominates = np.any(newb > newa) and np.all(newb >= newa)
 
     res = (a_dominates * 1) + (b_dominates * -1)
     return res

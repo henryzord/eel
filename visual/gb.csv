@@ -1,0 +1,5 @@
+,,,fold,fold,run,run,individual,individual,set_size,set_size,accuracy,accuracy
+,,,mean,std,mean,std,mean,std,mean,std,mean,std
+method,generation,set_name,,,,,,,,,,
+generate,0,test,0.5,0.547722557505,1,0.894427191,0,0.0,175.5,0.547722557505,0.909772666667,0.0155416352379
+generate,1,test,0.5,0.547722557505,1,0.894427191,0,0.0,175.5,0.547722557505,0.905968666667,0.0119604911047

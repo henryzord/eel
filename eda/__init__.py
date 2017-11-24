@@ -1,26 +1,21 @@
 import csv
+import datetime
 import itertools as it
 import json
-import time
+import os
+from datetime import datetime as dt
 from multiprocessing import Process, Manager, Lock
 
 import numpy as np
+import pandas as pd
+from pathlib2 import Path
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier as clf
 
 from core import get_predictions, get_classes
 from eda.dataset import path_to_sets
 from generation import generate
-from integration import integrate
-from selection import eda_select
-import os
-from datetime import datetime as dt
-import pandas as pd
-from pathlib2 import Path
 from generation import generate
-from selection import eda_select
-from integration import integrate
-import datetime
 
 
 class Reporter(object):
@@ -56,6 +51,16 @@ class Reporter(object):
         return hash(func.__name__ + str(self.fold))
 
     def save_accuracy(self, func, gen, weights, features, classifiers):
+        """
+
+        :param func: function that is calling this method.
+        :param gen: current generation.
+        :param weights: voting weights.
+        :param features:
+        :param classifiers:
+        :return:
+        """
+
         # self.__report__(func, gen, weights, features, classifiers, dict())
         p = Process(
             target=self.__save_accuracy__, args=(
@@ -214,34 +219,8 @@ def eel(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
     val_predictions = get_predictions(classifiers, features, X_val)
     test_predictions = get_predictions(classifiers, features, X_test)
 
-    print '-------------------------------------------------------'
-    print '---------------------- selection ----------------------'
-    print '-------------------------------------------------------'
-
-    if params['selection']['n_generations'] == 0:
-        best_classifiers = np.ones(len(classifiers), dtype=np.bool)
-    else:
-        best_classifiers = eda_select(
-            features, classifiers, val_predictions, y_val,
-            n_individuals=params['selection']['n_individuals'],
-            n_generations=params['selection']['n_generations'],
-            reporter=reporter
-        )
-
-    print '-------------------------------------------------------'
-    print '--------------------- integration ---------------------'
-    print '-------------------------------------------------------'
-
-    if params['integration']['n_generations'] == 0:
-        _best_weights = np.ones((len(best_classifiers), len(np.unique(y_val))), dtype=np.float32)
-    else:
-        _best_weights = integrate(
-            features[np.where(best_classifiers)], classifiers[np.where(best_classifiers)],
-            val_predictions[np.where(best_classifiers)], y_val,
-            n_individuals=params['integration']['n_individuals'],
-            n_generations=params['integration']['n_generations'],
-            reporter=reporter
-        )
+    best_classifiers = np.ones(len(classifiers), dtype=np.bool)
+    _best_weights = np.ones((len(best_classifiers), len(np.unique(y_val))), dtype=np.float32)
 
     '''
         Now testing

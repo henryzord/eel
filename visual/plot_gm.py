@@ -25,7 +25,7 @@ def __plot__(data, df):
 def main():
     off.init_notebook_mode()
     output_name = 'gm.html'
-    path_read = '/home/henry/Projects/eel/metadata'
+    path_read = '/home/henry/Projects/EELEM/metadata'
 
     generate_df = pd.DataFrame([])
     select_df = pd.DataFrame([])
@@ -68,7 +68,6 @@ def main():
     for step_name in overall.keys():
         traces += [
             go.Heatmap(
-                # y=overall['generate']['generation'],
                 z=overall[step_name]['data'],
                 colorscale='Magma',
                 zauto=False,

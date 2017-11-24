@@ -13,6 +13,10 @@ from datetime import datetime as dt
 import numpy as np
 
 
+def report_baseline():
+    pass
+
+
 def main():
     params = json.load(open('../params.json', 'r'))
 
@@ -28,7 +32,11 @@ def main():
 
     acc_randomforest = []
     acc_adaboost = []
-    acc_eel = []
+    acc_eelem = []
+
+    std_randomforest = []
+    std_adaboost = []
+    std_eelem = []
 
     n_all = X.shape[0]
 
@@ -37,7 +45,9 @@ def main():
     date = dt.now()
 
     for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
-        _run_eel = []
+        _run_eelem = []
+        _run_adaboost = []
+        _run_randomforest = []
         for run in xrange(params['n_runs']):
 
             X_train_val = X.iloc[train_index]
@@ -63,35 +73,48 @@ def main():
 
             n_test = X_test.shape[0]
 
+            adaboost = AdaBoostClassifier()
+            randomforest = RandomForestClassifier()
+
+            adaboost = adaboost.fit(X_train_val, y_train_val)  # type: AdaBoostClassifier
+            randomforest = randomforest.fit(X_train_val, y_train_val)  # type: RandomForestClassifier
+
             preds_eel = eel(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
-            _run_eel += [accuracy_score(y_test, preds_eel) * (float(n_test) / n_all)]
+            preds_adaboost = adaboost.predict(X_test)
+            preds_randomforest = randomforest.predict(X_test)
 
-        acc_eel += [np.mean(_run_eel)]
+            __acc_eelem = accuracy_score(y_test, preds_eel)
+            __acc_adaboost = accuracy_score(y_test, preds_adaboost)
+            __acc_randomforest = accuracy_score(y_test, preds_randomforest)
 
-        adaboost = AdaBoostClassifier()
-        randomforest = RandomForestClassifier()
+            # TODO save accuracy from adaboost and randomforest!
 
-        adaboost = adaboost.fit(X_train_val, y_train_val)  # type: AdaBoostClassifier
-        randomforest = randomforest.fit(X_train_val, y_train_val)  # type: RandomForestClassifier
+            # -------- accuracy for that run -------- #
+            _run_eelem += [__acc_eelem * (float(n_test) / n_all)]
+            _run_adaboost += [__acc_adaboost * (float(n_test) / n_all)]
+            _run_randomforest += [__acc_randomforest * (float(n_test) / n_all)]
 
-        preds_adaboost = adaboost.predict(X_test)
-        preds_randomforest = randomforest.predict(X_test)
+        # -------- accuracy for that fold -------- #
+        acc_eelem += [np.mean(_run_eelem)]
+        acc_adaboost += [np.mean(_run_adaboost)]
+        acc_randomforest += [np.mean(_run_randomforest)]
 
-        acc_adaboost += [accuracy_score(y_test, preds_adaboost) * (float(n_test) / n_all)]
-        acc_randomforest += [accuracy_score(y_test, preds_randomforest) * (float(n_test) / n_all)]
+        std_eelem += [np.std(_run_eelem)]
+        std_adaboost += [np.std(_run_adaboost)]
+        std_randomforest += [np.std(_run_randomforest)]
 
         print '----------------------------------'
         print 'partition accuracies:'
         print '----------------------------------'
-        print '\tadaboost accuracy: %.4f' % acc_adaboost[-1]
-        print '\trandomForest accuracy: %.4f' % acc_randomforest[-1]
-        print '\teel accuracy: %.4f' % acc_eel[-1]
+        print '\tadaboost accuracy: %.4f +- %.4f' % (acc_adaboost[-1], std_adaboost[-1])
+        print '\trandomForest accuracy: %.4f +- %.4f' % (acc_randomforest[-1], std_randomforest[-1])
+        print '\teelem accuracy: %.4f +- %.4f' % (acc_eelem[-1], std_eelem[-1])
         print '----------------------------------'
         print '----------------------------------'
 
-    print 'adaboost accuracy: %.4f' % sum(acc_adaboost)
-    print 'randomForest accuracy: %.4f' % sum(acc_randomforest)
-    print 'eel accuracy: %.4f' % sum(acc_eel)
+    print 'adaboost accuracy: %.4f +- %.4f' % (sum(acc_adaboost), np.mean(std_adaboost))
+    print 'randomForest accuracy: %.4f +- %.4f' % (sum(acc_randomforest), np.mean(std_randomforest))
+    print 'eelem accuracy: %.4f +- %.4f' % (sum(acc_eelem), np.mean(std_eelem))
 
 
 if __name__ == '__main__':
