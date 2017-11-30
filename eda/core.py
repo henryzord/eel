@@ -29,6 +29,7 @@ class DummyIterator(object):
                 self.current = 0
             raise StopIteration
 
+
 class DummyClassifier(object):
     def __init__(self):
         pass
@@ -160,37 +161,110 @@ def __get_classifier__(clf, selected_features, X_train, y_train, X_val):
 # ---------------------------------------------------#
 
 
-def get_flat_list(fronts):
-    return [item for sublist in fronts for item in sublist]
-
-
-def __pareto_encode_gm__(population, fitness):
+def get_flat_list(array):
     """
-    Encodes a new graphical model based on a population of individuals in Pareto Fronts.
+    Returns a flat list, made out of a list of lists.
 
-    :param population:
-    :param fitness:
-    :return:
+    :param array: A list of lists.
+    :return: A flat list.
     """
-    to_pick = []
 
-    # where first position is the first front, second position is the first front, and so on
-    fronts = get_fronts(fitness)
+    return [item for sublist in array for item in sublist]
 
-    # TODO must use optimized operator for selecting solutions!
 
-    # compress list of lists in a single list of ordered individuals, based on their non-dominated rank
-    flat_list = get_flat_list(fronts)
+def __pareto_encode_gm__(A, P, P_fitness, select_strength=0.5):
+    """
+    Encodes a new graphical model based on a population of individuals in Pareto Fronts. Uses selection operator from
+        Laumanns, Marco and Ocenasek, Jiri. Bayesian Optimization Algorithms for Multi-objective Optimization. 2002.
 
-    # start picking individuals from these fronts
-    for i, ind in enumerate(flat_list):
-        # if any(np.array(fitness[ind]) < np.array(medians)):
-        #     break
-        if i < (len(population) / 2):
-            to_pick += [list(population[ind])]
+    :param A: a boolean array the size of the population, where True means that
+        this individual is in the elite, and False otherwise.
+    :param P: Proper population.
+    :param P_fitness: Quality of elite individuals
+    :return: New Graphical Model.
+    """
+    assert isinstance(A, np.ndarray), TypeError('A must be a list!')
+    assert isinstance(P, list), TypeError('P must be a list!')
 
-    gm = np.sum(to_pick, axis=0) / float(len(to_pick))
-    return gm
+    # TODO this
+    fronts = get_fronts(P_fitness)
+    _flat = get_flat_list(fronts)
+    A_ = _flat[:int(len(P_fitness) * select_strength)]
+
+    A[:] = False
+    A[A_] = True
+
+    # TODO or this
+    # A_ = select_operator(
+    #     A_size=len(A),
+    #     P_size=len(P),
+    #     Q=Q_fitness,
+    #     u=int(0.25 * len(P_fitness)),
+    #     e=0.1
+    # )
+
+    gm = np.sum([P[i].tolist() for i in A_], axis=0) / float(len(A_))
+    return gm, A
+
+
+def select_operator(A_size, P_size, Q, u, e):
+    """
+
+    :type A_size: int
+    :param A_size: A length. Starts at 0.
+    :type P_size: int
+    :param P_size: P length. Starts at A.
+    :type Q: numpy.ndarray
+    :param Q: An array denoting the quality of solutions. The first A elements are the former elite,
+        and the following P elements the current population.
+    :type u: int
+    :param u: minimum size of new elite populaiton
+    :type e: float
+    :param e: approximation factor: the smaller it is, the small the tolerance for difference is. Resides within [0, 1].
+    :return: Selected individuals.
+    """
+    log2e = np.log2(e)
+
+    A = set(range(A_size))
+    P = set(range(A_size, A_size + P_size))
+
+    floor = np.array([np.floor(np.log2(x) / log2e) for x in Q])
+
+    for x in P:
+        similar = np.multiply.reduce(
+            floor[x] == floor[list(A)],
+            axis=1
+        )
+        B = set(np.flatnonzero(similar))  # B_index is the set of solutions similar to x_index
+
+        if len(B) == 0:  # if there is no solution remotely equal to x
+            A |= {x}  # add x to the new elite
+        elif any([(a_dominates_b(Q[y], Q[x]) == -1) for y in B]):  # TODO investigate!
+            # if there is a solution in new_A_index that dominates x
+            # A = A - (B | {x})
+            A = (A - B) | {x}  # TODO changed line
+
+    A_ = set()
+    for y in A:
+        add = True
+        for z in A:
+            if a_dominates_b(Q[y], Q[z]) == -1:  # TODO Investigate!
+                add = False
+                break
+        if add:
+            A_ |= {y}
+
+    D = A - A_
+
+    if len(A_) < u:
+        _fronts = get_fronts(Q[list(D | A_)])
+        _flat_list = get_flat_list(_fronts)
+        for ind in _flat_list:
+            A_ |= {ind}
+            if len(A_) >= u:
+                break
+
+    return list(A_)
 
 
 def pairwise_domination(P, Q=None):
@@ -224,7 +298,7 @@ def a_dominates_b(a, b):
 
     :param a: list of performance in the n objective functions of individual a
     :param b: list of performance in the n objective functions of individual b
-    :return: -1 if b dominates a, +1 if the opposite, and 0 if there is no dominance
+    :return: -1 if b dominates a, +1 if the opposite, and 0 if there is no dominance (i.e. same front)
     """
     assert type(a) == type(b), TypeError('a and b must have the same type!')
     assert type(a) in [np.void, np.ndarray, list], TypeError('invalid type for a and b! Must be either lists or void objects!')
@@ -243,42 +317,43 @@ def a_dominates_b(a, b):
     return res
 
 
-def crowding_distance_assignment(_set):
+def crowding_distance_sort(P, indices):
     """
-    Worst case scenario for this function: O(m * H * log(H)), where m
-    is the number of objectives and H the size of population.
+        Worst case scenario for this function: O(m * P * log(P)), where m
+        is the number of objectives and P the size of population.
 
-    :type _set: numpy.ndarray
-    :param _set: An numpy.ndarray with m dimensions,
-        where the first value in the tuple is the quality of the solution
-        in the first objective, and so on and so forth.
-    :return: A list of crowding distances.
-    """
+        Adapted from A fast elitist non-dominated sorting genetic algorithm for multi-objective optimization: NSGA-II
 
-    n_individuals, n_objectives = _set.shape
-    crowd_dists = np.zeros(n_individuals, dtype=np.float32)
+        :type P: numpy.ndarray
+        :param P: An numpy.ndarray with m dimensions,
+            where the first value in the tuple is the quality of the solution
+            in the first objective, and so on and so forth.
+        :type indices: list
+        :param indices: indices for individuals in the current front.
+        :rtype: numpy.ndarray
+        :return: A list of crowding distances.
+        """
 
-    for objective in xrange(n_objectives):
-        _set_obj = sorted(_set, key=lambda x: x[objective])
-        crowd_dists[[0, -1]] = [np.inf, np.inf]
-        for i in xrange(1, n_individuals - 1):
-            crowd_dists[i] = crowd_dists[i] + (_set_obj[i + 1][objective] - _set_obj[i - 1][objective])
+    n_individuals, n_objectives = P[indices].shape
+    redux = np.empty((n_individuals, n_objectives + 2), dtype=np.float32)  # for index and crowding distance
+    redux[:, 0] = indices  # indices
+    redux[:, 1] = 0.  # crowding distance starts at zero
+    redux[:, [2, 3]] = P[indices]  # absorbs quality of individuals
 
-    return crowd_dists
+    for objective in xrange(2, 2 + n_objectives):
+        redux = redux[redux[:, objective].argsort()]
+        redux[[0, -1], 1] = np.inf  # edge individuals have maximum crowding distance
+        for i in xrange(1, n_individuals - 1):  # from 1-th individual to N-1 (included)
+            redux[i, 1] = redux[i, 1] + abs(redux[i + 1, objective] - redux[i - 1, objective])
 
-
-def crowding_distance_sort(_set, indices):
-    crowd_dists = crowding_distance_assignment(_set[indices])
-    _sorted_indices = map(
-        lambda x: x[1],
-        sorted(zip(crowd_dists, indices), key=lambda x: x[0], reverse=False)
-    )
-    return _sorted_indices
+    redux = redux[redux[:, 1].argsort()[::-1]]
+    return redux[:, 0].astype(np.int32)
 
 
 def get_fronts(pop):
     """
-    Based on a population of individuals, order them based on their Pareto dominance.
+    Based on a population of individuals, order them based on their Pareto dominance. Adapted from
+    A fast elitist non-dominated sorting genetic algorithm for multi-objective optimization: NSGA-II.
 
     :param pop: A matrix where rows are individuals and columns their fitness in each one of the objectives.
     :type pop: numpy.ndarray
@@ -288,42 +363,48 @@ def get_fronts(pop):
     n_individuals, n_objectives = pop.shape
 
     added = np.zeros(n_individuals, dtype=np.bool)
-    dominated = np.zeros(n_individuals, dtype=np.int32)
-    dominates = [[] for x in xrange(n_individuals)]
+    count_dominated = np.zeros(n_individuals, dtype=np.int32)
+    list_dominates = [[] for x in xrange(n_individuals)]
     fronts = []
-
-    cur_front = 0
 
     for i in xrange(n_individuals):
         for j in xrange(i + 1, n_individuals):
             res = a_dominates_b(pop[i], pop[j])
             if res == 1:
-                dominated[j] += 1
-                dominates[i] += [j]
+                count_dominated[j] += 1
+                list_dominates[i] += [j]
             elif res == -1:
-                dominated[i] += 1
-                dominates[j] += [i]
+                count_dominated[i] += 1
+                list_dominates[j] += [i]
 
+    # iteratively process fronts
+    n_front = 0
     while sum(added) < n_individuals:
-        _where = (dominated == 0)
+        _where = (count_dominated == 0)
 
-        if _where.max() == 0:  # no individuals that are not dominated by any other; add remaining
-            fronts += [np.flatnonzero(added == 0)]
+        # there are only individuals that do not dominate any other remaining; add those to the last 'front'
+        if _where.max() == 0:
+            current_front = np.flatnonzero(added == 0).tolist()
+            fronts += [crowding_distance_sort(pop, current_front)]
             break
 
-        added[_where] = 1
+        added[_where] = True  # add those individuals to the 'processed' list
 
         current_front = np.flatnonzero(_where)
 
         fronts += [crowding_distance_sort(pop, current_front)]
-        dominated[_where] = -1
+        count_dominated[current_front] = -1
 
-        _chain = set(reduce(op.add, map(lambda x: dominates[x], _where)))
+        _chain = set(reduce(
+            op.add,
+            map(
+                lambda (i, x): list_dominates[i],
+                enumerate(_where))
+            )
+        )
+        count_dominated[list(_chain)] -= 1  # decrements one domination
 
-        for k in _chain:
-            dominated[k] -= 1
-
-        cur_front += 1
+        n_front += 1
 
     return fronts
 

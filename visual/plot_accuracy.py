@@ -15,8 +15,6 @@ def __plot__(data, df):
         _subset = df.loc[df['set_name'] == set_name]
         gb = _subset.groupby(by=['method', 'generation', 'set_name']).aggregate([np.mean, np.std])
 
-        gb.to_csv('gb.csv')  # TODO remove!
-
         acc = gb['accuracy']
 
         y = acc['mean']
@@ -38,7 +36,7 @@ def __plot__(data, df):
 def main():
     off.init_notebook_mode()
     output_name = 'accuracy.html'
-    path_read = '/home/henry/Projects/EELEM/metadata'
+    path_read = '/home/henry/Projects/eel/metadata'
 
     generate_df = pd.DataFrame([])
     select_df = pd.DataFrame([])

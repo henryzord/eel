@@ -6,7 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
-from eda import eel, Reporter
+from eda import eelem, Reporter
 from eda.dataset import path_to_dataframe
 from datetime import datetime as dt
 
@@ -79,7 +79,7 @@ def main():
             adaboost = adaboost.fit(X_train_val, y_train_val)  # type: AdaBoostClassifier
             randomforest = randomforest.fit(X_train_val, y_train_val)  # type: RandomForestClassifier
 
-            preds_eel = eel(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
+            preds_eel = eelem(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
             preds_adaboost = adaboost.predict(X_test)
             preds_randomforest = randomforest.predict(X_test)
 
@@ -95,7 +95,7 @@ def main():
             _run_randomforest += [__acc_randomforest * (float(n_test) / n_all)]
 
         # -------- accuracy for that fold -------- #
-        acc_eelem += [np.mean(_run_eelem)]
+        acc_eelem += [np.mean(_run_eelem)]  # the accuracy for eelem in that fold is the mean for N runs
         acc_adaboost += [np.mean(_run_adaboost)]
         acc_randomforest += [np.mean(_run_randomforest)]
 
@@ -104,7 +104,7 @@ def main():
         std_randomforest += [np.std(_run_randomforest)]
 
         print '----------------------------------'
-        print 'partition accuracies:'
+        print '------ partition accuracies: -----'
         print '----------------------------------'
         print '\tadaboost accuracy: %.4f +- %.4f' % (acc_adaboost[-1], std_adaboost[-1])
         print '\trandomForest accuracy: %.4f +- %.4f' % (acc_randomforest[-1], std_randomforest[-1])

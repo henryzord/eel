@@ -48,10 +48,19 @@ def get_generation_fitness(ensemble, fitness, val_predictions, y_val):
     First objective is accuracy. Second objective is double-fault.
     see 'Genetic Algorithms with diversity measures to build classifier systems' for references
 
+    :type ensemble:
     :param ensemble: List of classifiers.
+    :type fitness: numpy.ndarray
     :param fitness: matrix to store fitness values.
+    :type val_predictions: numpy.ndarray
+    :param val_predictions: matrix where each row is a classifier and each column a prediction for that instance.
+    :type y_val: numpy.ndarray
+    :param y_val: array with real class for validation set.
+    :rtype: numpy.ndarray
     :return: Returns a tuple where the first item is the fitness in the first objective, and so on and so forth.
     """
+    from sklearn.preprocessing import normalize
+
     n_classifiers = len(ensemble)
 
     n_instances_val = y_val.shape[0]
@@ -71,14 +80,17 @@ def get_generation_fitness(ensemble, fitness, val_predictions, y_val):
             pairwise_double_fault[i, j] = index
             pairwise_double_fault[j, i] = index
 
-        fitness[i, 1] = np.mean(pairwise_double_fault[i, :])
+        warnings.warn('WARNING: using max instead of min!')
+        fitness[i, 1] = np.median(pairwise_double_fault[i, :])
 
+    fitness = normalize(fitness, axis=0, norm='max')  # TODO remove later!
     return fitness
 
 
 def generate(
         X_train, y_train, X_val, y_val, base_classifier,
         n_classifiers=100, n_generations=100,
+        selection_strength=0.5,
         save_every=5, reporter=None
 ):
     """
@@ -111,26 +123,28 @@ def generate(
     n_instances_val = X_val.shape[0]
 
     initial_prob = 0.5
-    gm = np.full(shape=n_features, fill_value=initial_prob, dtype=np.float32)
+    gm = np.full(shape=n_features, fill_value=initial_prob, dtype=np.float32)  # initial gm
 
     classifiers = np.empty(n_classifiers, dtype=np.object)
 
     # first column for accuracy, second for scalar double fault
-    fitness = np.empty((n_classifiers, n_objectives), dtype=np.float32)
+    P_fitness = np.empty((n_classifiers, n_objectives), dtype=np.float32)
     val_preds = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
 
     # population
-    population = [bitarray(n_features) for i in xrange(n_classifiers)]
+    P = [bitarray(n_features) for i in xrange(n_classifiers)]
+    A = np.zeros(n_classifiers, dtype=np.bool)
 
     t1 = dt.now()
 
     g = 0
     while g < n_generations:
         for j in xrange(n_classifiers):
-            for k in xrange(n_features):
-                population[j][k] = np.random.choice(a=[0, 1], p=[1. - gm[k], gm[k]])
+            if not A[j]:
+                for k in xrange(n_features):
+                    P[j][k] = np.random.choice(a=[0, 1], p=[1. - gm[k], gm[k]])
 
-            selected_features = X_features[list(population[j])]
+            selected_features = X_features[list(P[j])]
             classifiers[j], val_preds[j] = __get_classifier__(
                 base_classifier, selected_features, X_train, y_train, X_val
             )
@@ -139,17 +153,17 @@ def generate(
         dfd = distinct_failure_diversity(val_preds, y_val)
         ensemble_acc = accuracy_score(y_val, ensemble_preds)
 
-        fitness = get_generation_fitness(classifiers, fitness, val_preds, y_val)
-        medians = np.median(fitness, axis=0)
-        means = np.mean(fitness, axis=0)
+        P_fitness = get_generation_fitness(classifiers, P_fitness, val_preds, y_val)
+        medians = np.median(P_fitness, axis=0)
+        means = np.mean(P_fitness, axis=0)
 
-        gm = __pareto_encode_gm__(population, fitness)
+        gm, A = __pareto_encode_gm__(A, P, P_fitness, select_strength=selection_strength)
 
         t2 = dt.now()
 
         try:
-            reporter.save_accuracy(generate, g, dummy_weight_vector, ConversorIterator(population), classifiers)
-            reporter.save_population(generate, population, g, save_every)
+            reporter.save_accuracy(generate, g, dummy_weight_vector, ConversorIterator(P), classifiers)
+            reporter.save_population(generate, P, g, save_every)
             reporter.save_gm(generate, g, gm)
         except AttributeError:
             pass
@@ -161,18 +175,9 @@ def generate(
         g += 1
 
     try:
-        reporter.save_population(generate, population)
+        reporter.save_population(generate, P)
     except AttributeError:
         pass
 
-    dense = np.array(map(lambda x: x.tolist(), population))
-
-    fronts = get_fronts(fitness)
-    flat_list = [item for sublist in fronts for item in sublist]
-
-    to_pick = []
-    for i, ind in enumerate(flat_list):
-        if i < (len(population) / 2):
-            to_pick += [ind]
-
-    return classifiers[to_pick], dense[to_pick], fitness[to_pick]
+    features = np.array(map(lambda x: x.tolist(), P))
+    return classifiers, features, P_fitness

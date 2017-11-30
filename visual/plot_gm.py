@@ -25,7 +25,7 @@ def __plot__(data, df):
 def main():
     off.init_notebook_mode()
     output_name = 'gm.html'
-    path_read = '/home/henry/Projects/EELEM/metadata'
+    path_read = '/home/henry/Projects/eel/metadata'
 
     generate_df = pd.DataFrame([])
     select_df = pd.DataFrame([])

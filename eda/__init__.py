@@ -203,7 +203,7 @@ class Reporter(object):
             p.join()
 
 
-def eel(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
+def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
     print '-------------------------------------------------------'
     print '--------------------- generation ----------------------'
     print '-------------------------------------------------------'
@@ -213,6 +213,7 @@ def eel(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
         base_classifier=clf,
         n_classifiers=params['generation']['n_individuals'],
         n_generations=params['generation']['n_generations'],
+        selection_strength=params['generation']['selection_strength'],
         reporter=reporter
     )
 
@@ -251,7 +252,7 @@ if __name__ == '__main__':
         fold=1
     )
 
-    preds = eel(metaparams, X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
+    preds = eelem(metaparams, X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
     acc = accuracy_score(y_test, preds)
     print 'test accuracy: %.2f' % acc
 
