@@ -236,16 +236,16 @@ def select_operator(A_truth, P_fitness, u, e):
 
         if len(B) == 0:  # if there is no solution remotely equal to x
             A |= {x}  # add x to the new elite
-        elif any([(a_dominates_b(P_fitness[y], P_fitness[x]) == 0) for y in B]):  # TODO investigate!
+        elif any([(a_dominates_b(P_fitness[y], P_fitness[x]) < 1) for y in B]):
             # if there is a solution in new_A_index that dominates x
             # A = A - (B | {x})
-            A = A - (B | {x})  # TODO changed line
+            A = A - (B | {x})
 
     A_ = set()
     for y in A:
         add = True
         for z in A:
-            if a_dominates_b(P_fitness[y], P_fitness[z]) == 0:  # TODO Investigate!
+            if a_dominates_b(P_fitness[y], P_fitness[z]) < 1:
                 add = False
                 break
         if add:

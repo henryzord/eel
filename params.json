@@ -3,11 +3,11 @@
   "random_state": 0,
   "n_folds": 3,
   "reporter_output": "/home/henry/Projects/eel/metadata",
-  "n_runs": 5,
+  "n_runs": 3,
   "metaparams": {
     "generation": {
-      "n_individuals": 100,
-      "n_generations": 10,
+      "n_individuals": 200,
+      "n_generations": 25,
       "selection_strength": 0.5,
       "verbose": true
     },

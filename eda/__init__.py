@@ -14,8 +14,8 @@ from sklearn.tree import DecisionTreeClassifier as clf
 
 from core import get_predictions, get_classes
 from eda.dataset import path_to_sets
-from generation import generate
-from generation import generate
+from eda.generation import EnsembleGenerator
+from eda.integration import integrate
 
 
 class Reporter(object):
@@ -178,7 +178,7 @@ class Reporter(object):
 
         lock.acquire()
 
-        if func.__name__ == generate.__name__:
+        if func.__name__ == EnsembleGenerator.generate.__name__:
             dense = np.array(map(lambda x: x.tolist(), population))
         elif func.__name__ == integrate.__name__:
             dense = np.array(map(lambda x: x.ravel(), population))
@@ -208,9 +208,17 @@ def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None)
     print '--------------------- generation ----------------------'
     print '-------------------------------------------------------'
 
-    classifiers, features, fitness = generate(
-        X_train, y_train, X_val, y_val,
-        base_classifier=clf,
+    from eda.generation import EnsembleGenerator
+
+    gen_inst = EnsembleGenerator(
+        X_train=X_train,
+        y_train=y_train,
+        X_val=X_val,
+        y_val=y_val,
+        base_classifier=clf
+    )
+
+    classifiers, features, fitness = gen_inst.generate(
         n_classifiers=params['generation']['n_individuals'],
         n_generations=params['generation']['n_generations'],
         selection_strength=params['generation']['selection_strength'],
