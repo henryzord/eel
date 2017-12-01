@@ -186,36 +186,33 @@ def __pareto_encode_gm__(A, P, P_fitness, select_strength=0.5):
     assert isinstance(A, np.ndarray), TypeError('A must be a list!')
     assert isinstance(P, list), TypeError('P must be a list!')
 
-    # TODO this
+    # either this
     fronts = get_fronts(P_fitness)
     _flat = get_flat_list(fronts)
     A_ = _flat[:int(len(P_fitness) * select_strength)]
 
-    A[:] = False
-    A[A_] = True
-
-    # TODO or this
+    # or this
     # A_ = select_operator(
-    #     A_size=len(A),
-    #     P_size=len(P),
-    #     Q=Q_fitness,
+    #     A_truth=A,
+    #     P_fitness=P_fitness,
     #     u=int(0.25 * len(P_fitness)),
     #     e=0.1
     # )
+
+    A[:] = False
+    A[A_] = True
 
     gm = np.sum([P[i].tolist() for i in A_], axis=0) / float(len(A_))
     return gm, A
 
 
-def select_operator(A_size, P_size, Q, u, e):
+def select_operator(A_truth, P_fitness, u, e):
     """
 
-    :type A_size: int
-    :param A_size: A length. Starts at 0.
-    :type P_size: int
-    :param P_size: P length. Starts at A.
-    :type Q: numpy.ndarray
-    :param Q: An array denoting the quality of solutions. The first A elements are the former elite,
+    :type A_truth: np.ndarray
+    :param A_truth: A boolean array denoting the elite individuals.
+    :type P_fitness: numpy.ndarray
+    :param P_fitness: An array denoting the quality of solutions. The first A elements are the former elite,
         and the following P elements the current population.
     :type u: int
     :param u: minimum size of new elite populaiton
@@ -225,10 +222,10 @@ def select_operator(A_size, P_size, Q, u, e):
     """
     log2e = np.log2(e)
 
-    A = set(range(A_size))
-    P = set(range(A_size, A_size + P_size))
+    P = set(np.flatnonzero(A_truth == False))
+    A = set(np.flatnonzero(A_truth == True))
 
-    floor = np.array([np.floor(np.log2(x) / log2e) for x in Q])
+    floor = np.floor(np.log2(P_fitness) / log2e)
 
     for x in P:
         similar = np.multiply.reduce(
@@ -239,16 +236,16 @@ def select_operator(A_size, P_size, Q, u, e):
 
         if len(B) == 0:  # if there is no solution remotely equal to x
             A |= {x}  # add x to the new elite
-        elif any([(a_dominates_b(Q[y], Q[x]) == -1) for y in B]):  # TODO investigate!
+        elif any([(a_dominates_b(P_fitness[y], P_fitness[x]) == 0) for y in B]):  # TODO investigate!
             # if there is a solution in new_A_index that dominates x
             # A = A - (B | {x})
-            A = (A - B) | {x}  # TODO changed line
+            A = A - (B | {x})  # TODO changed line
 
     A_ = set()
     for y in A:
         add = True
         for z in A:
-            if a_dominates_b(Q[y], Q[z]) == -1:  # TODO Investigate!
+            if a_dominates_b(P_fitness[y], P_fitness[z]) == 0:  # TODO Investigate!
                 add = False
                 break
         if add:
@@ -257,7 +254,7 @@ def select_operator(A_size, P_size, Q, u, e):
     D = A - A_
 
     if len(A_) < u:
-        _fronts = get_fronts(Q[list(D | A_)])
+        _fronts = get_fronts(P_fitness[list(D | A_)])
         _flat_list = get_flat_list(_fronts)
         for ind in _flat_list:
             A_ |= {ind}

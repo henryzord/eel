@@ -13,20 +13,14 @@ def main():
     random.seed(2)
     np.random.seed(2)
 
-    # former elite begin
-    A = np.random.random((10, 2))
-    fronts = get_fronts(A)
-    A = A[fronts[0]]
-    # former elite end
-
     P = np.random.random((10, 2))
-
-    Q = np.vstack((A, P))
+    fronts = get_fronts(P)
+    A = np.zeros(P.shape[0], dtype=np.bool)
+    A[fronts[0]] = True
 
     next_A = select_operator(
-        len(A),
-        len(P),
-        Q,
+        A,
+        P,
         5,
         0.5
     )
@@ -41,7 +35,7 @@ def main():
         for j, (x, y) in it.izip(front, P[front]):
             plt.annotate(str(j), (x, y), (x+0.01, y+0.01))
 
-    plt.scatter(Q[next_A, 0], Q[next_A, 1], s=80, facecolors='none', edgecolors='purple')
+    plt.scatter(P[next_A, 0], P[next_A, 1], s=80, facecolors='none', edgecolors='purple')
 
     plt.xlim(0, 1)
     plt.ylim(0, 1)

@@ -1,9 +1,9 @@
 {
-  "full_path": "/home/henry/Projects/eel/datasets/kdd_synthetic_control.arff",
+  "full_path": "/home/henry/Projects/eel/datasets/segment.arff",
   "random_state": 0,
-  "n_folds": 10,
+  "n_folds": 3,
   "reporter_output": "/home/henry/Projects/eel/metadata",
-  "n_runs": 10,
+  "n_runs": 5,
   "metaparams": {
     "generation": {
       "n_individuals": 100,
