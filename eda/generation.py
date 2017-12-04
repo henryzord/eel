@@ -5,9 +5,8 @@ import numpy as np
 from bitarray import bitarray
 from sklearn.metrics import accuracy_score
 
-from core import __pareto_encode_gm__, get_classes, distinct_failure_diversity, get_fronts
+from core import __pareto_encode_gm__, get_classes, distinct_failure_diversity
 from eda.core import __get_classifier__, DummyIterator
-from sklearn.preprocessing import normalize
 
 '''
 Check
@@ -80,8 +79,7 @@ class EnsembleGenerator(object):
             fitness[i, 0] = accuracy_score(self.y_val, val_predictions[i, :])
 
             for j in xrange(i, n_classifiers):
-                # index = np.sum(np.logical_or(
-                index = np.sum(np.logical_xor(
+                index = np.sum(np.logical_or(
                     val_predictions[i] == self.y_val,
                     val_predictions[j] == self.y_val
                 )) / float(n_instances_val)
@@ -89,6 +87,7 @@ class EnsembleGenerator(object):
                 pairwise_double_fault[i, j] = index
                 pairwise_double_fault[j, i] = index
 
+            # warnings.warn('WARNING: using min instead of mean!')
             fitness[i, 1] = np.mean(pairwise_double_fault[i, :])
 
         # fitness = normalize(fitness, axis=0, norm='max')  # normalize fitness
@@ -112,15 +111,9 @@ class EnsembleGenerator(object):
 
         return P, P_fitness, classifiers, val_preds
 
-
     def generate(self, n_classifiers=100, n_generations=100, selection_strength=0.5, save_every=5, reporter=None):
         """
 
-        :param X_train:
-        :param y_train:
-        :param X_val:
-        :param y_val:
-        :param base_classifier:
         :param n_classifiers:
         :param n_generations:
         :param save_every:
@@ -141,30 +134,17 @@ class EnsembleGenerator(object):
 
         initial_prob = 0.5
         gm_0 = np.full(shape=self.n_features, fill_value=initial_prob, dtype=np.float32)  # pareto multi-objective
-        gm_1 = np.full(shape=self.n_features, fill_value=initial_prob, dtype=np.float32)  # optimizes only validation accuracy
-        gm_2 = np.full(shape=self.n_features, fill_value=initial_prob, dtype=np.float32)  # optimizes only validation diversity
 
         classifiers_0 = np.empty(n_classifiers, dtype=np.object)
-        classifiers_1 = np.empty(n_classifiers, dtype=np.object)
-        classifiers_2 = np.empty(n_classifiers, dtype=np.object)
 
         # first column for accuracy, second for scalar double fault
         P_fitness_0 = np.empty((n_classifiers, n_objectives), dtype=np.float32)
-        P_fitness_1 = np.empty(n_classifiers, dtype=np.float32)
-        P_fitness_2 = np.empty(n_classifiers, dtype=np.float32)
-
         val_preds_0 = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
-        val_preds_1 = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
-        val_preds_2 = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
 
         # population
         P_0 = [bitarray(self.n_features) for i in xrange(n_classifiers)]
-        P_1 = [bitarray(self.n_features) for i in xrange(n_classifiers)]
-        P_2 = [bitarray(self.n_features) for i in xrange(n_classifiers)]
 
         A_0 = np.zeros(n_classifiers, dtype=np.bool)
-        A_1 = np.zeros(n_classifiers, dtype=np.bool)
-        A_2 = np.zeros(n_classifiers, dtype=np.bool)
 
         t1 = dt.now()
 
@@ -181,10 +161,8 @@ class EnsembleGenerator(object):
             ensemble_acc = accuracy_score(self.y_val, ensemble_preds)
 
             medians = np.median(P_fitness_0, axis=0)
-            means = np.mean(P_fitness_0, axis=0)
 
-            gm, A = __pareto_encode_gm__(A_0, P_0, P_fitness_0, select_strength=selection_strength)
-
+            gm_0, A_0 = __pareto_encode_gm__(A_0, P_0, P_fitness_0, select_strength=selection_strength)
 
             try:
                 reporter.save_accuracy(self.generate, g, dummy_weight_vector, ConversorIterator(P_0), classifiers_0)
@@ -193,8 +171,8 @@ class EnsembleGenerator(object):
             except AttributeError:
                 pass
 
-            print 'generation %2.d: ens val acc: %.2f dfd: %.4f median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
-                g, ensemble_acc, dfd, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
+            print 'generation %2.d: ens val acc: %.2f dfd: %.4f median: (%.4f, %.4f) time elapsed: %f' % (
+                g, ensemble_acc, dfd, medians[0], medians[1], (t2 - t1).total_seconds()
             )
             t1 = t2
             g += 1

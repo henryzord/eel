@@ -87,8 +87,6 @@ def main():
             __acc_adaboost = accuracy_score(y_test, preds_adaboost)
             __acc_randomforest = accuracy_score(y_test, preds_randomforest)
 
-            # TODO save accuracy from adaboost and randomforest!
-
             # -------- accuracy for that run -------- #
             _run_eelem += [__acc_eelem * (float(n_test) / n_all)]
             _run_adaboost += [__acc_adaboost * (float(n_test) / n_all)]

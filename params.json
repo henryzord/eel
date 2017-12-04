@@ -1,5 +1,5 @@
 {
-  "full_path": "/home/henry/Projects/eel/datasets/segment.arff",
+  "full_path": "/home/henry/Projects/eel/datasets/liver-disorders.arff",
   "random_state": 0,
   "n_folds": 3,
   "reporter_output": "/home/henry/Projects/eel/metadata",
@@ -7,7 +7,7 @@
   "metaparams": {
     "generation": {
       "n_individuals": 200,
-      "n_generations": 25,
+      "n_generations": 10,
       "selection_strength": 0.5,
       "verbose": true
     },
