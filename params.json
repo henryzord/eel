@@ -1,13 +1,13 @@
 {
-  "full_path": "/home/henry/Projects/eel/datasets/liver-disorders.arff",
+  "full_path": "/home/henry/Projects/eel/datasets/uci/semeion.arff",
   "random_state": 0,
   "n_folds": 3,
   "reporter_output": "/home/henry/Projects/eel/metadata",
-  "n_runs": 3,
+  "n_runs": 1,
   "metaparams": {
     "generation": {
-      "n_individuals": 200,
-      "n_generations": 10,
+      "n_individuals": 100,
+      "n_generations": 50,
       "selection_strength": 0.5,
       "verbose": true
     },

@@ -70,15 +70,14 @@ class Reporter(object):
         self.processes += [p]
         p.start()
 
-    def save_population(self, func, population, gen=1, save_every=1):
-        if (gen > 0) and (gen % save_every == 0):
-            # self.__save__(self.output_path, self.date, func, population, dict())
-            p = Process(
-                target=self.__save_population__,
-                args=(self.output_path, self.date, func, population, self.population_lock)
-            )
-            self.processes += [p]
-            p.start()
+    def save_population(self, func, population, gen=1):
+        # self.__save__(self.output_path, self.date, func, population, dict())
+        p = Process(
+            target=self.__save_population__,
+            args=(self.output_path, self.date, func, population, self.population_lock)
+        )
+        self.processes += [p]
+        p.start()
 
     def save_gm(self, func, gen, gm):
         p = Process(

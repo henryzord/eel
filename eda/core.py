@@ -144,7 +144,8 @@ def __get_classifier__(clf, selected_features, X_train, y_train, X_val):
     assert isinstance(X_train, pd.DataFrame), TypeError('X_train must be a pandas.DataFrame!')
     assert isinstance(X_val, pd.DataFrame), TypeError('X_val must be a pandas.DataFrame!')
 
-    model = clf(random_state=0)
+    warnings.warn('WARNING: limiting tree size at height 5!')
+    model = clf(random_state=0, max_depth=5)
 
     classes = np.unique(y_train)
 
@@ -152,9 +153,10 @@ def __get_classifier__(clf, selected_features, X_train, y_train, X_val):
         model = DummyClassifier()
     else:
         model = model.fit(X_train[selected_features], y_train)
-    preds = model.predict(X_val[selected_features])
+    val_preds = model.predict(X_val[selected_features])
+    train_preds = model.predict(X_train[selected_features])
 
-    return model, preds
+    return model, val_preds, train_preds
 
 # ---------------------------------------------------#
 # ----------- # pareto-related methods # ----------- #
@@ -172,7 +174,7 @@ def get_flat_list(array):
     return [item for sublist in array for item in sublist]
 
 
-def __pareto_encode_gm__(A, P, P_fitness, select_strength=0.5):
+def __pareto_encode_gm__(A, P, P_fitness, select_strength=0.5, **kwargs):
     """
     Encodes a new graphical model based on a population of individuals in Pareto Fronts. Uses selection operator from
         Laumanns, Marco and Ocenasek, Jiri. Bayesian Optimization Algorithms for Multi-objective Optimization. 2002.
@@ -188,6 +190,16 @@ def __pareto_encode_gm__(A, P, P_fitness, select_strength=0.5):
 
     # either this
     fronts = get_fronts(P_fitness)
+
+    # warnings.warn('WARNING: plotting!')
+    # from matplotlib import pyplot as plt
+    # from matplotlib import cm
+    # plt.figure()
+    # plt.scatter(P_fitness[:, 0], P_fitness[:, 1])
+    # plt.xlim(0.9, 1)
+    # plt.ylim(0.9, 1)
+    # plt.show()
+
     _flat = get_flat_list(fronts)
     A_ = _flat[:int(len(P_fitness) * select_strength)]
 
