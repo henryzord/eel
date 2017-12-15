@@ -1,53 +1,23 @@
-from collections import Counter
 from datetime import datetime as dt
 
 import numpy as np
-from sklearn.metrics import accuracy_score
 
-from core import check_distribution, __pareto_encode_gm__
-from eda.core import get_fronts, distinct_failure_diversity
+from eda import get_fronts
 
 
-def simple_select(ensemble, population, predictions, X_val, y_val):
-    accs = np.sum(predictions, axis=1) / float(predictions.shape[1])
-
-    median = np.median(accs)
-    # # warnings.warn('warning: using whole population')
-    to_select = np.ones(len(population), dtype=np.bool)
-    # to_select = accs > median
-
-    best_ensemble = ensemble[to_select]
-    best_population = population[to_select]
-    predictions = predictions[to_select]
-
-    check_distribution(best_ensemble, best_population, X_val, y_val)
-
-    return best_ensemble, best_population, predictions
-
-
-def get_selection_fitness(individual_preds, y_true):
-    n_classifiers, n_instances = individual_preds.shape
-
-    counts = map(lambda x: Counter(individual_preds[:, x]).most_common(1)[0][0], xrange(n_instances))
-    acc = accuracy_score(y_true, counts)
-    div = distinct_failure_diversity(individual_preds, y_true)
-
-    return acc, div
-
-
-def eda_select(
+def select(
         features, classifiers, val_predictions, y_val,
-        n_individuals=100, n_generations=100, save_every=5, reporter=None
+        n_individuals=100, n_generations=100, reporter=None
 ):
     """
-
+    Select an ensemble of classifiers.
 
     :param features:
+    :param classifiers:
     :param val_predictions:
     :param y_val:
     :param n_individuals:
     :param n_generations:
-    :param save_every:
     :type reporter: eda.Reporter
     :param reporter:
     :return:
@@ -78,8 +48,8 @@ def eda_select(
             fitness[i, :] = get_selection_fitness(val_predictions[sel_pop[i]], y_val)
 
         try:
-            reporter.save_accuracy(eda_select, g, dummy_weights, features, classifiers)
-            reporter.save_population(eda_select, sel_pop, g, save_every)
+            reporter.save_accuracy(select, g, dummy_weights, features, classifiers)
+            reporter.save_population(select, sel_pop, g)
         except AttributeError:
             pass
 
@@ -100,16 +70,17 @@ def eda_select(
         )
         t1 = t2
 
-        gm = __pareto_encode_gm__(sel_pop, fitness)
+        gm = __pareto_encode_gm__(selected, sel_pop, fitness)
 
     # medians = np.median(fitness, axis=0)
     # selected = np.multiply.reduce(fitness >= medians, axis=1)
 
     fronts = get_fronts(fitness)
     try:
-        reporter.save_population(eda_select, sel_pop)
+        reporter.save_population(select, sel_pop)
     except AttributeError:
         pass
 
     # first individual from first front, which is the most sparse in comparison to other individuals
+    raise NotImplementedError('not implemented yet!')
     return fronts[0][0]

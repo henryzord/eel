@@ -1,24 +1,65 @@
 import json
-
+import numpy as np
 import pandas as pd
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import StratifiedKFold, train_test_split
-
-from eda import eelem, Reporter
-from eda.dataset import path_to_dataframe
 from datetime import datetime as dt
 
-import numpy as np
+from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.tree import DecisionTreeClassifier as clf
+
+from eda import Reporter, Ensemble
+from utils import path_to_dataframe
+from eda.generation import EnsembleGenerator
+from eda.selection import select
 
 
-def report_baseline():
-    pass
+def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
+    print '-------------------------------------------------------'
+    print '--------------------- generation ----------------------'
+    print '-------------------------------------------------------'
+
+    gen_inst = EnsembleGenerator(
+        X_train=X_train,
+        y_train=y_train,
+        X_val=X_val,
+        y_val=y_val,
+        base_classifier=clf
+    )
+
+    classifiers, features, fitness = gen_inst.generate(
+        n_classifiers=params['generation']['n_individuals'],
+        n_generations=params['generation']['n_generations'],
+        selection_strength=params['generation']['selection_strength'],
+        reporter=reporter
+    )
+
+    val_predictions = get_predictions(classifiers, features, X_val)
+    test_predictions = get_predictions(classifiers, features, X_test)
+
+    selected_classifiers = select(
+        features=features, classifiers=classifiers,
+        val_predictions=val_predictions, y_val=y_val,
+        n_individuals=params['selection']['n_individuals'],
+        n_generations=params['selection']['n_generations'],
+        reporter=reporter
+    )
+
+    raise NotImplementedError('not implemented yet!')
+
+    best_classifiers = np.ones(len(classifiers), dtype=np.bool)
+    _best_weights = np.ones((len(best_classifiers), len(np.unique(y_val))), dtype=np.float32)
+
+    '''
+        Now testing
+    '''
+
+    y_test_pred = get_classes(_best_weights, test_predictions[np.where(best_classifiers)])
+    return y_test_pred
 
 
 def main():
-    params = json.load(open('../params.json', 'r'))
+    params = json.load(open('params.json', 'r'))
 
     full_df = path_to_dataframe(params['full_path'])
 

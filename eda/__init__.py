@@ -1,8 +1,9 @@
 import csv
 import datetime
 import itertools as it
-import json
+import operator as op
 import os
+from collections import Counter
 from datetime import datetime as dt
 from multiprocessing import Process, Manager, Lock
 
@@ -10,12 +11,254 @@ import numpy as np
 import pandas as pd
 from pathlib2 import Path
 from sklearn.metrics import accuracy_score
-from sklearn.tree import DecisionTreeClassifier as clf
+from sklearn.tree import DecisionTreeClassifier
 
-from core import get_predictions, get_classes
-from eda.dataset import path_to_sets
-from eda.generation import EnsembleGenerator
-from eda.integration import integrate
+from utils import flatten
+
+
+class Ensemble(object):
+    def __init__(
+            self,
+            X_train, X_val, y_train, y_val,
+            n_classifiers=None, classifiers=None, base_classifier=None,
+            n_features=None, features=None,
+            activated=None, voting_weights=None,
+    ):
+        """
+
+        :type X_train: pandas.DataFrame
+        :param X_train:
+        :type X_val: pandas.DataFrame
+        :param X_val:
+        :param y_train:
+        :param y_val:
+        :param classifiers: A list of classifiers that are in compliance
+            with the (fit, predict) interface of sklearn classifiers.
+        :param features: An matrix where each row is a classifier and each
+            column denotes the absence or presence of that attribute for the given classifier.
+        :param activated: A boolean array denoting the activated classifiers.
+        :param voting_weights: An matrix of shape (n_classifiers, n_classes).
+        """
+
+        assert isinstance(X_train, pd.DataFrame), TypeError('X_train must be a pandas.DataFrame!')
+        assert isinstance(X_val, pd.DataFrame), TypeError('X_val must be a pandas.DataFrame!')
+
+        scratch = ((n_classifiers is not None) and (base_classifier is not None))
+
+        if scratch:
+            if X_train is None or X_val is None or y_train is None or y_val is None:
+                raise ValueError(
+                    'When building an ensemble from scratch, training and validation sets must be provided!'
+                )
+
+            self.base_classifier = base_classifier
+            self.classifiers = [DummyClassifier() for x in xrange(n_classifiers)]
+        elif classifiers is not None:
+            self.base_classifier = type(classifiers[0])
+            self.classifiers = classifiers
+        else:
+            raise ValueError(
+                'Either a list of classifiers or the number of '
+                'base classifiers (along with the base type) must be provided!'
+            )
+        # finally:
+        self.n_classifiers = len(self.classifiers)
+
+        if features is not None:
+            self.features = features
+        elif n_features is not None:
+            self.features = np.zeros(
+                (n_classifiers, n_features), dtype=np.int32
+            )
+        else:
+            raise ValueError('Either a list of activated features or the number of features must be provided!')
+        # finally:
+        self.n_features = len(self.features[0])
+
+        self.X_train = X_train
+        self.X_val = X_val
+        self.y_train = y_train
+        self.y_val = y_val
+        self.feature_names = self.X_train.columns
+
+        if voting_weights is not None:
+            self.voting_weights = voting_weights
+            self.n_classes = self.voting_weights.shape[1]
+        else:
+            self.n_classes = len(np.unique(
+                np.hstack((y_train, y_val))
+            ))
+            self.voting_weights = np.ones(
+                (self.n_classifiers, self.n_classes), dtype=np.float32
+            )
+
+        if activated is not None:
+            self.activated = activated
+        else:
+            self.activated = np.ones(self.n_classifiers, dtype=np.int32)
+
+        n_instances_val = self.X_val.shape[0]
+        n_instances_train = self.X_train.shape[0]
+
+        self.train_preds = np.empty((n_classifiers, n_instances_train), dtype=np.int32)
+        self.val_preds = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
+
+    @property
+    def fitness(self):
+        raise NotImplementedError('not implemented yet!')
+
+    def get_genotype(self, index):
+        return self.features[index, :]
+
+    def set_classifier(self, index, base_classifier, feature_index):
+        """
+
+        :param index: classifier to be replaced.
+        :param base_classifier: Type of the base classifier.
+        :param feature_index: A boolean array denoting the selected features for this classifier.
+        """
+
+        assert index < self.n_classifiers, \
+            ValueError('index must be a value lesser than the number of total classifiers!')
+
+        model = base_classifier(random_state=0, max_depth=5)  # type: DecisionTreeClassifier
+
+        selected_features = self.feature_names[feature_index]
+
+        if len(feature_index) <= 0:
+            model = DummyClassifier()
+        else:
+            model = model.fit(self.X_train[selected_features], self.y_train)
+
+        self.classifiers[index] = model
+
+        self.features[index, :] = feature_index
+        self.train_preds[index, :] = model.predict(self.X_train[selected_features])
+        self.val_preds[index, :] = model.predict(self.X_val[selected_features])
+
+        return self
+
+
+    @classmethod
+    def create_base(cls, X_train, y_train, X_val, y_val, base_classifier, n_classifiers, n_features):
+        base = cls(
+            X_train=X_train, X_val=X_val, y_train=y_train, y_val=y_val,
+            base_classifier=base_classifier, n_classifiers=n_classifiers, n_features=n_features,
+        )
+
+        return base
+
+    @classmethod
+    def load_population(cls, base_classifier, population, X_train, y_train, X_val, y_val, verbose=True):
+        raise NotImplementedError('not implemented yet!')
+
+        self.X_train = X_train
+        self.X_val = X_val
+        self.y_train = y_train
+        self.y_val = y_val
+
+        X_features = X_train.columns
+
+        n_classifiers, n_attributes = population.shape
+
+        ensemble = np.empty(n_classifiers, dtype=np.object)
+        predictions = np.empty((n_classifiers, X_val.shape[0]), dtype=np.int32)
+
+        for j in xrange(n_classifiers):  # number of base classifiers
+            selected_features = X_features[np.flatnonzero(population[j])]
+            ensemble[j], predictions[j] = __get_classifier__(
+                base_classifier, selected_features,
+                X_train, y_train, X_val
+            )
+            if j % 50 == 0 and verbose:
+                print 'Loaded %d classifiers' % j
+
+        return ensemble, population, predictions
+
+    def get_predictions(self, X, preds=None):
+        """
+        Given a list of classifiers and the features each one of them uses, returns a matrix of predictions for dataset X.
+
+        :param X: A dataset comprised of instances and attributes.
+        :param preds: optional - matrix where each row is a classifier and each column an instance.
+        :return: An matrix where each row is a classifier and each column an instance in X.
+        """
+
+        X_features = X.columns
+
+        if preds is None:
+            preds = np.empty((self.n_classifiers, X.shape[0]), dtype=np.int32)
+
+        for j in xrange(self.n_classifiers):  # number of base classifiers
+            selected_features = X_features[np.flatnonzero(self.features[j])]
+            preds[j, :] = self.classifiers[j].predict(X[selected_features])
+
+        return preds
+
+    def predict(self, X, preds=None):
+        """
+
+        :param X: A dataset comprised of instances and attributes.
+        :param preds: optional - matrix where each row is a classifier and each column an instance.
+        :return: An array where each position contains the ensemble prediction for that instance.
+        """
+        preds = self.get_predictions(X, preds)
+
+        n_classifiers, n_classes = self.voting_weights.shape
+        n_classifiers, n_instances = preds.shape
+
+        local_votes = np.empty(n_classes, dtype=np.float32)
+        global_votes = np.empty(n_instances, dtype=np.int32)
+
+        for i in xrange(n_instances):
+            local_votes[:] = 0.
+
+            for j in xrange(n_classifiers):
+                local_votes[preds[j, i]] += self.voting_weights[j, preds[j, i]]
+
+            global_votes[i] = np.argmax(local_votes)
+
+        return global_votes
+
+    @staticmethod
+    def distinct_failure_diversity(predictions, y_true):
+        """
+        Implements distinct failure diversity. See
+            Derek Partridge & Wo jtek Krzanowski. Distinct Failure Diversity in Multiversion Software. 1997
+            for more information.
+
+        :type predictions: numpy.ndarray
+        :param predictions:
+        :type y_true: pandas.Series
+        :param y_true:
+        :return:
+        """
+        if isinstance(predictions, pd.DataFrame):
+            predictions = predictions.values
+
+        if isinstance(y_true, pd.Series):
+            y_true = y_true.tolist()
+
+        n_classifiers, n_instances = predictions.shape
+        distinct_failures = np.zeros(n_classifiers + 1, dtype=np.float32)
+
+        for i in xrange(n_instances):
+            truth = y_true[i]
+            count = Counter(predictions[:, i])
+            for cls, n_votes in count.items():
+                if cls != truth:
+                    distinct_failures[n_votes] += 1
+
+        distinct_failures_count = np.sum(distinct_failures)  # type: int
+
+        dfd = 0.
+
+        if (distinct_failures_count > 0) and (n_classifiers > 1):
+            for j in xrange(1, n_classifiers + 1):
+                dfd += (float(n_classifiers - j) / float(n_classifiers - 1)) * \
+                       (float(distinct_failures[j]) / distinct_failures_count)
+
+        return dfd
 
 
 class Reporter(object):
@@ -50,7 +293,7 @@ class Reporter(object):
     def __get_hash__(self, func):
         return hash(func.__name__ + str(self.fold))
 
-    def save_accuracy(self, func, gen, weights, features, classifiers):
+    def save_accuracy(self, func, gen, ensemble):
         """
 
         :param func: function that is calling this method.
@@ -61,17 +304,17 @@ class Reporter(object):
         :return:
         """
 
-        # self.__report__(func, gen, weights, features, classifiers, dict())
+        # self.__save_accuracy__(func, gen, weights, features, classifiers, dict())
         p = Process(
             target=self.__save_accuracy__, args=(
-                func, gen, weights, features, classifiers, self.report_lock
+                func, gen, ensemble, self.report_lock
             )
         )
         self.processes += [p]
         p.start()
 
     def save_population(self, func, population, gen=1):
-        # self.__save__(self.output_path, self.date, func, population, dict())
+        # self.__save_population__(self.output_path, self.date, func, population, dict())
         p = Process(
             target=self.__save_population__,
             args=(self.output_path, self.date, func, population, self.population_lock)
@@ -115,14 +358,11 @@ class Reporter(object):
 
         lock.release()
 
-    def __save_accuracy__(self, func, gen, weights, features, classifiers, lock):
+    def __save_accuracy__(self, caller, gen, ensemble, lock):
         """
 
-        :param func:
+        :param caller:
         :param gen:
-        :param weights:
-        :param features:
-        :param classifiers:
         :type lock: multiprocessing.Lock
         :param lock:
         :return:
@@ -131,12 +371,13 @@ class Reporter(object):
         lock.acquire()
 
         n_sets = len(self.Xs)
-        n_individuals = len(weights)
 
-        accs = np.empty(n_sets * n_individuals, dtype=np.float32)
+        accs = np.empty(n_sets * ensemble.n_classifiers, dtype=np.float32)
+
+        raise NotImplementedError('not implemented yet!')
 
         counter = 0
-        for weight_set in weights:
+        for weight_set in ensemble.voting_weights:
             for j, (X, y) in enumerate(it.izip(self.Xs, self.ys)):
                 preds = get_predictions(classifiers, features, X)
                 classes = get_classes(weight_set, preds)
@@ -144,13 +385,14 @@ class Reporter(object):
                 accs[counter] = acc
                 counter += 1
 
-        output = os.path.join(self.output_path, self.date + '_' + 'report_' + func.__name__ + '.csv')
+        output = os.path.join(self.output_path, self.date + '_' + 'report_' + caller.__name__ + '.csv')
         # if not created
         pth = Path(output)
         if not pth.exists():
             with open(output, 'w') as f:
                 writer = csv.writer(f, delimiter=',')
-                writer.writerow(['method', 'fold', 'run', 'generation', 'individual', 'set_name', 'set_size', 'accuracy'])
+                writer.writerow(
+                    ['method', 'fold', 'run', 'generation', 'individual', 'set_name', 'set_size', 'accuracy'])
 
         counter = 0
         with open(output, 'a') as f:
@@ -158,7 +400,9 @@ class Reporter(object):
 
             for i in xrange(n_individuals):
                 for j in xrange(n_sets):
-                    writer.writerow([func.__name__, self.fold, self.run, str(gen), str(i), self.set_names[j], self.set_sizes[j], str(accs[counter])])
+                    writer.writerow(
+                        [caller.__name__, self.fold, self.run, str(gen), str(i), self.set_names[j], self.set_sizes[j],
+                         str(accs[counter])])
                     counter += 1
 
         lock.release()
@@ -177,10 +421,8 @@ class Reporter(object):
 
         lock.acquire()
 
-        if func.__name__ == EnsembleGenerator.generate.__name__:
+        if func.__name__ == 'generate':
             dense = np.array(map(lambda x: x.tolist(), population))
-        elif func.__name__ == integrate.__name__:
-            dense = np.array(map(lambda x: x.ravel(), population))
         else:
             dense = population
 
@@ -202,65 +444,260 @@ class Reporter(object):
             p.join()
 
 
-def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
-    print '-------------------------------------------------------'
-    print '--------------------- generation ----------------------'
-    print '-------------------------------------------------------'
+class DummyIterator(object):
+    def __init__(self, value, length, reset=True):
+        self.current = 0
+        self.length = length
+        self.value = value
+        self.reset = reset
 
-    from eda.generation import EnsembleGenerator
+    def __len__(self):
+        return self.length
 
-    gen_inst = EnsembleGenerator(
-        X_train=X_train,
-        y_train=y_train,
-        X_val=X_val,
-        y_val=y_val,
-        base_classifier=clf
-    )
+    def __iter__(self):
+        return self
 
-    classifiers, features, fitness = gen_inst.generate(
-        n_classifiers=params['generation']['n_individuals'],
-        n_generations=params['generation']['n_generations'],
-        selection_strength=params['generation']['selection_strength'],
-        reporter=reporter
-    )
-
-    val_predictions = get_predictions(classifiers, features, X_val)
-    test_predictions = get_predictions(classifiers, features, X_test)
-
-    best_classifiers = np.ones(len(classifiers), dtype=np.bool)
-    _best_weights = np.ones((len(best_classifiers), len(np.unique(y_val))), dtype=np.float32)
-
-    '''
-        Now testing
-    '''
-
-    y_test_pred = get_classes(_best_weights, test_predictions[np.where(best_classifiers)])
-    return y_test_pred
+    def next(self):
+        if self.current < self.length:
+            self.current += 1
+            return self.value
+        else:
+            if self.reset:
+                self.current = 0
+            raise StopIteration
 
 
-if __name__ == '__main__':
-    params = json.load(open('../params.json', 'r'))
+class DummyClassifier(object):
+    def __init__(self):
+        pass
 
-    metaparams = params['metaparams']
+    def fit(self, X_train, y_train):
+        pass
 
-    X_train, y_train, X_val, y_val, X_test, y_test = path_to_sets(
-        params['full_path'],
-        train_size=0.5,
-        test_size=0.25,
-        val_size=0.25,
-        random_state=params['random_state']
-    )
+    def predict(self, X_test):
+        return np.ones(X_test.shape[0], dtype=np.int32) * -1
 
-    reporter = Reporter(
-        Xs=[X_train, X_val, X_test],
-        ys=[y_train, y_val, y_test],
-        set_names=['train', 'val', 'test'],
-        output_path=params['reporter_output'],
-        fold=1
-    )
 
-    preds = eelem(metaparams, X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
-    acc = accuracy_score(y_test, preds)
-    print 'test accuracy: %.2f' % acc
+# def check_distribution(ensemble, features, X, y):
+#     n_classifiers = len(ensemble)
+#
+#     preds = np.empty((n_classifiers, y.shape[0]), dtype=np.float32)
+#
+#     X_features = X.columns
+#
+#     for i, classifier, features in it.izip(np.arange(n_classifiers), ensemble, features):
+#         preds[i] = classifier.predict(X[X_features[features]])
+#
+#     print 'distribution of votes per instance in evaluation set:'
+#
+#     counts = map(lambda x: Counter(preds[:, x]), xrange(y.shape[0]))
+#
+#     df = pd.DataFrame(counts, dtype=np.float32)
+#     df.fillna(0., inplace=True)
+#     print df
 
-    reporter.join_all()
+
+# ---------------------------------------------------#
+# ----------- # pareto-related methods # ----------- #
+# ---------------------------------------------------#
+
+def __deprecated_select_operator__(A_truth, P_fitness, u, e):
+    """
+    WARNING: deprecated.
+
+    :type A_truth: np.ndarray
+    :param A_truth: A boolean array denoting the elite individuals.
+    :type P_fitness: numpy.ndarray
+    :param P_fitness: An array denoting the quality of solutions. The first A elements are the former elite,
+        and the following P elements the current population.
+    :type u: int
+    :param u: minimum size of new elite populaiton
+    :type e: float
+    :param e: approximation factor: the smaller it is, the small the tolerance for difference is. Resides within [0, 1].
+    :return: Selected individuals.
+    """
+    log2e = np.log2(e)
+
+    P = set(np.flatnonzero(A_truth == False))
+    A = set(np.flatnonzero(A_truth == True))
+
+    floor = np.floor(np.log2(P_fitness) / log2e)
+
+    for x in P:
+        similar = np.multiply.reduce(
+            floor[x] == floor[list(A)],
+            axis=1
+        )
+        B = set(np.flatnonzero(similar))  # B_index is the set of solutions similar to x_index
+
+        if len(B) == 0:  # if there is no solution remotely equal to x
+            A |= {x}  # add x to the new elite
+        elif any([(a_dominates_b(P_fitness[y], P_fitness[x]) < 1) for y in B]):
+            # if there is a solution in new_A_index that dominates x
+            # A = A - (B | {x})
+            A = A - (B | {x})
+
+    A_ = set()
+    for y in A:
+        add = True
+        for z in A:
+            if a_dominates_b(P_fitness[y], P_fitness[z]) < 1:
+                add = False
+                break
+        if add:
+            A_ |= {y}
+
+    D = A - A_
+
+    if len(A_) < u:
+        _fronts = get_fronts(P_fitness[list(D | A_)])
+        _flat_list = flatten(_fronts)
+        for ind in _flat_list:
+            A_ |= {ind}
+            if len(A_) >= u:
+                break
+
+    return list(A_)
+
+
+def pairwise_domination(P, Q=None):
+    """
+
+    :type P: numpy.ndarray
+    :param P: Population of individuals. If Q is not provided, it will calculate the pairwise domination among
+        P individuals.
+    :type Q: numpy.ndarray
+    :param Q: optional - second population of individuals. If provided, will calculate domination among P and Q
+        populations, in a way that in the cell D[i, j], for example, denotes the dominance of the i-th individual
+        of P over the j-th individual of Q.
+    :rtype: numpy.ndarray
+    :return: An matrix where each cell determines if the individual in that row
+        dominates the individual in that column, and vice-versa.
+    """
+
+    n_p_individuals, = P.shape
+    n_q_individuals, = Q.shape if Q is not None else P.shape
+
+    matrix = np.empty((n_p_individuals, n_q_individuals), dtype=np.int32)
+    for i in xrange(n_p_individuals):
+        for j in xrange(n_q_individuals):
+            matrix[i, j] = a_dominates_b(P[i], P[j])
+
+    return matrix
+
+
+def a_dominates_b(a, b):
+    """
+
+    :param a: list of performance in the n objective functions of individual a
+    :param b: list of performance in the n objective functions of individual b
+    :return: -1 if b dominates a, +1 if the opposite, and 0 if there is no dominance (i.e. same front)
+    """
+    assert type(a) == type(b), TypeError('a and b must have the same type!')
+    assert type(a) in [np.void, np.ndarray, list], TypeError(
+        'invalid type for a and b! Must be either lists or void objects!')
+
+    if isinstance(a, np.void):
+        newa = [a[name] for name in a.dtype.names]
+        newb = [b[name] for name in b.dtype.names]
+    else:
+        newa = a
+        newb = b
+
+    a_dominates = np.any(newa > newb) and np.all(newa >= newb)
+    b_dominates = np.any(newb > newa) and np.all(newb >= newa)
+
+    res = (a_dominates * 1) + (b_dominates * -1)
+    return res
+
+
+def crowding_distance_sort(P, indices):
+    """
+        Worst case scenario for this function: O(m * P * log(P)), where m
+        is the number of objectives and P the size of population.
+
+        Adapted from A fast elitist non-dominated sorting genetic algorithm for multi-objective optimization: NSGA-II
+
+        :type P: numpy.ndarray
+        :param P: An numpy.ndarray with m dimensions,
+            where the first value in the tuple is the quality of the solution
+            in the first objective, and so on and so forth.
+        :type indices: list
+        :param indices: indices for individuals in the current front.
+        :rtype: numpy.ndarray
+        :return: A list of crowding distances.
+        """
+
+    n_individuals, n_objectives = P[indices].shape
+    redux = np.empty((n_individuals, n_objectives + 2), dtype=np.float32)  # for index and crowding distance
+    redux[:, 0] = indices  # indices
+    redux[:, 1] = 0.  # crowding distance starts at zero
+    redux[:, [2, 3]] = P[indices]  # absorbs quality of individuals
+
+    for objective in xrange(2, 2 + n_objectives):
+        redux = redux[redux[:, objective].argsort()]
+        redux[[0, -1], 1] = np.inf  # edge individuals have maximum crowding distance
+        for i in xrange(1, n_individuals - 1):  # from 1-th individual to N-1 (included)
+            redux[i, 1] = redux[i, 1] + abs(redux[i + 1, objective] - redux[i - 1, objective])
+
+    redux = redux[redux[:, 1].argsort()[::-1]]
+    return redux[:, 0].astype(np.int32)
+
+
+def get_fronts(pop):
+    """
+    Based on a population of individuals, order them based on their Pareto dominance. Adapted from
+    A fast elitist non-dominated sorting genetic algorithm for multi-objective optimization: NSGA-II.
+
+    :param pop: A matrix where rows are individuals and columns their fitness in each one of the objectives.
+    :type pop: numpy.ndarray
+    :return:
+    """
+
+    n_individuals, n_objectives = pop.shape
+
+    added = np.zeros(n_individuals, dtype=np.bool)
+    count_dominated = np.zeros(n_individuals, dtype=np.int32)
+    list_dominates = [[] for x in xrange(n_individuals)]
+    fronts = []
+
+    for i in xrange(n_individuals):
+        for j in xrange(i + 1, n_individuals):
+            res = a_dominates_b(pop[i], pop[j])
+            if res == 1:
+                count_dominated[j] += 1
+                list_dominates[i] += [j]
+            elif res == -1:
+                count_dominated[i] += 1
+                list_dominates[j] += [i]
+
+    # iteratively process fronts
+    n_front = 0
+    while sum(added) < n_individuals:
+        _where = (count_dominated == 0)
+
+        # there are only individuals that do not dominate any other remaining; add those to the last 'front'
+        if _where.max() == 0:
+            current_front = np.flatnonzero(added == 0).tolist()
+            fronts += [crowding_distance_sort(pop, current_front)]
+            break
+
+        added[_where] = True  # add those individuals to the 'processed' list
+
+        current_front = np.flatnonzero(_where)
+
+        fronts += [crowding_distance_sort(pop, current_front)]
+        count_dominated[current_front] = -1
+
+        _chain = set(reduce(
+            op.add,
+            map(
+                lambda (i, x): list_dominates[i],
+                enumerate(_where))
+        )
+        )
+        count_dominated[list(_chain)] -= 1  # decrements one domination
+
+        n_front += 1
+
+    return fronts

@@ -1,21 +1,19 @@
-import warnings
-from datetime import datetime as dt
-
-import numpy as np
-from bitarray import bitarray
-from sklearn.metrics import accuracy_score
-
-from core import __pareto_encode_gm__, get_classes, distinct_failure_diversity
-from eda.core import __get_classifier__, DummyIterator
-
-'''
+"""
 Check
 
 > Using Bayesian Networks for Selecting Classifiers in GP Ensembles
 
 for a measure on diversity.
- 
-'''
+"""
+
+from datetime import datetime as dt
+
+import numpy as np
+from bitarray import bitarray
+from eda import Ensemble, get_fronts
+from sklearn.metrics import accuracy_score
+
+from utils import flatten
 
 
 class ConversorIterator(object):
@@ -51,42 +49,48 @@ class EnsembleGenerator(object):
         self.X_train = X_train
         self.X_features = self.X_train.columns
         self.n_features = len(self.X_features)
+        self.n_objectives = 2
 
-    def get_generation_fitness(self, ensemble, fitness, val_predictions, train_predictions):
+    def __get_fitness__(
+            self, ensemble,
+            P_fitness=None, pairwise_double_fault_train=None, pairwise_double_fault_val=None
+    ):
         """
-
         First objective is accuracy. Second objective is double-fault.
         see 'Genetic Algorithms with diversity measures to build classifier systems' for references
 
         :type ensemble:
         :param ensemble: List of classifiers.
-        :type fitness: numpy.ndarray
-        :param fitness: matrix to store fitness values.
-        :type val_predictions: numpy.ndarray
-        :param val_predictions: matrix where each row is a classifier and each column a prediction for that instance.
-        :type y_val: numpy.ndarray
-        :param y_val: array with real class for validation set.
+        :type P_fitness: numpy.ndarray
+        :param P_fitness: matrix to store fitness values.
+        :param pairwise_double_fault_train:
+        :param pairwise_double_fault_val:
         :rtype: numpy.ndarray
         :return: Returns a tuple where the first item is the fitness in the first objective, and so on and so forth.
         """
-        n_classifiers = len(ensemble)
-
+        n_classifiers = ensemble.n_classifiers
         n_instances_val = self.y_val.shape[0]
         n_instances_train = self.y_train.shape[0]
 
-        pairwise_double_fault_val = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
-        pairwise_double_fault_train = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
+        if P_fitness is None:
+            P_fitness = np.empty((n_classifiers, self.n_objectives), dtype=np.float32)
+
+        if pairwise_double_fault_train is None:
+            pairwise_double_fault_train = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
+
+        if pairwise_double_fault_val is None:
+            pairwise_double_fault_val = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
 
         for i in xrange(n_classifiers):
             for j in xrange(i, n_classifiers):
-                val_index = np.sum(np.logical_or(
-                    val_predictions[i] == self.y_val,
-                    val_predictions[j] == self.y_val
+                val_index = np.sum(np.logical_xor(
+                    ensemble.val_preds[i] == self.y_val,
+                    ensemble.val_preds[j] == self.y_val
                 )) / float(n_instances_val)
 
-                train_index = np.sum(np.logical_or(
-                    train_predictions[i] == self.y_train,
-                    train_predictions[j] == self.y_train
+                train_index = np.sum(np.logical_xor(
+                    ensemble.train_preds[i] == self.y_train,
+                    ensemble.train_preds[j] == self.y_train
                 )) / float(n_instances_train)
 
                 pairwise_double_fault_val[i, j] = val_index
@@ -95,28 +99,74 @@ class EnsembleGenerator(object):
                 pairwise_double_fault_train[i, j] = train_index
                 pairwise_double_fault_train[j, i] = train_index
 
-            fitness[i, 0] = np.median(pairwise_double_fault_train[i, :])
-            fitness[i, 1] = np.median(pairwise_double_fault_val[i, :])
+            P_fitness[i, 0] = np.median(pairwise_double_fault_train[i, :])
+            P_fitness[i, 1] = np.median(pairwise_double_fault_val[i, :])
 
-        return fitness
+        return P_fitness
 
-    def __sample__(self, A, P, P_fitness, gm, classifiers, val_preds, train_preds):
-        n_classifiers = len(classifiers)
-        n_features = len(self.X_features)
+    def __get_elite__(self, P_fitness, A=None):
+        fronts = get_fronts(P_fitness)
+        flat = flatten(fronts)
+        n_individuals = len(P_fitness)
+        A_index = flat[:(n_individuals/2)]
+        if A is None:
+            A = np.zeros(n_individuals, dtype=np.int32)
 
-        for j in xrange(n_classifiers):
+        A[A_index] = True
+        return A
+
+    def __sample__(self, A, P, gm, ensemble):
+        """
+
+        :param A:
+        :param P:
+        :param gm:
+        :type ensemble: eda.Ensemble
+        :param ensemble:
+        :return:
+        """
+
+        for j in xrange(ensemble.n_classifiers):
             if not A[j]:
-                for k in xrange(n_features):
+                for k in xrange(ensemble.n_features):
                     P[j][k] = np.random.choice(a=[0, 1], p=[1. - gm[k], gm[k]])
 
-            selected_features = self.X_features[list(P[j])]
-            classifiers[j], val_preds[j], train_preds[j] = __get_classifier__(
-                self.base_classifier, selected_features, self.X_train, self.y_train, self.X_val
-            )
+            feature_index = list(P[j])
+            ensemble = ensemble.set_classifier(index=j, base_classifier=self.base_classifier, feature_index=feature_index)
 
-        P_fitness = self.get_generation_fitness(classifiers, P_fitness, val_preds, train_preds)
+        return ensemble
 
-        return P, P_fitness, classifiers, val_preds, train_preds
+    def __update__(self, A, ensemble, gm, selection_strength=0.5):
+        """
+        Encodes a new graphical model based on a population of individuals in Pareto Fronts. Uses selection operator from
+            Laumanns, Marco and Ocenasek, Jiri. Bayesian Optimization Algorithms for Multi-objective Optimization. 2002.
+
+        :param A: a boolean array the size of the population, where True means that
+            this individual is in the elite, and False otherwise.
+        :param P: Proper population.
+        :param P_fitness: Quality of elite individuals
+        :return: New Graphical Model.
+        """
+        assert isinstance(A, np.ndarray), TypeError('A must be a list!')
+        assert isinstance(ensemble, Ensemble), TypeError('ensemble must be an instance of eda.Ensemble!')
+
+        # warnings.warn('WARNING: plotting!')
+        # from matplotlib import pyplot as plt
+        # from matplotlib import cm
+        # plt.figure()
+        # plt.scatter(P_fitness[:, 0], P_fitness[:, 1])
+        # plt.xlim(0.9, 1)
+        # plt.ylim(0.9, 1)
+        # plt.show()
+
+        gm[:] = 0.
+        for i in xrange(ensemble.n_classifiers):
+            if A[i]:
+                gm += ensemble.get_genotype(i)
+
+        gm /= np.count_nonzero(A)
+
+        return gm, A
 
     def generate(self, n_classifiers=100, n_generations=100, selection_strength=0.5, reporter=None):
         """
@@ -127,68 +177,65 @@ class EnsembleGenerator(object):
         :param reporter:
         :return:
         """
-        n_objectives = 2  # accuracy and diversity
-        # -- dummy weights -- #
-        n_classes = len(np.unique(self.y_val))
-        dummy_weights = np.ones((n_classifiers, n_classes), dtype=np.float32)
-        dummy_weight_vector = DummyIterator(  # whole population of classifiers equals to one ensemble
-            dummy_weights, length=1, reset=True
+        ensemble = Ensemble.create_base(
+            X_train=self.X_train,
+            X_val=self.X_val,
+            y_train=self.y_train,
+            y_val=self.y_val,
+            base_classifier=self.base_classifier,
+            n_classifiers=n_classifiers,
+            n_features=self.n_features,
         )
-        # -- dummy weights -- #
-
-        n_instances_val = self.X_val.shape[0]
-        n_instances_train = self.X_train.shape[0]
 
         initial_prob = 0.5
-        gm = np.full(shape=self.n_features, fill_value=initial_prob, dtype=np.float32)  # pareto multi-objective
+        gm = np.full(shape=self.n_features, fill_value=initial_prob, dtype=np.float32)
 
-        classifiers = np.empty(n_classifiers, dtype=np.object)
+        pairwise_double_fault_train = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
+        pairwise_double_fault_val = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
 
-        # first column for accuracy, second for scalar double fault
-        P_fitness = np.empty((n_classifiers, n_objectives), dtype=np.float32)
-        val_preds = np.empty((n_classifiers, n_instances_val), dtype=np.int32)
-        train_preds = np.empty((n_classifiers, n_instances_train), dtype=np.int32)
+        P = [bitarray(self.n_features) for i in xrange(n_classifiers)]  # population
+        P_fitness = np.empty((n_classifiers, self.n_objectives), dtype=np.float32)
+        A = np.zeros(n_classifiers, dtype=np.bool)  # elite
 
-        # population
-        P = [bitarray(self.n_features) for i in xrange(n_classifiers)]
+        for g in xrange(n_generations):
+            t1 = dt.now()
 
-        A = np.zeros(n_classifiers, dtype=np.bool)
-
-        t1 = dt.now()
-
-        g = 0
-        while g < n_generations:
-            t2 = dt.now()
-
-            P, P_fitness, classifiers, val_preds, train_preds = self.__sample__(
-                A, P, P_fitness, gm, classifiers, val_preds, train_preds
+            ensemble = self.__sample__(A=A, P=P, gm=gm, ensemble=ensemble)
+            P_fitness = self.__get_fitness__(
+                ensemble, P_fitness=P_fitness,
+                pairwise_double_fault_train=pairwise_double_fault_train,
+                pairwise_double_fault_val=pairwise_double_fault_val
             )
 
-            ensemble_val_preds = get_classes(dummy_weights, val_preds)
-            dfd = distinct_failure_diversity(val_preds, self.y_val)
-            ensemble_val_acc = accuracy_score(self.y_val, ensemble_val_preds)
+            A = self.__get_elite__(P_fitness, A=A)
 
             medians = np.median(P_fitness, axis=0)
 
-            gm, A = __pareto_encode_gm__(A, P, P_fitness, select_strength=selection_strength)
+            gm, A = self.__update__(A, ensemble, gm, selection_strength=selection_strength)
+            ensemble_val_preds = ensemble.predict(self.X_val, ensemble.val_preds)
+            ensemble_val_acc = accuracy_score(self.y_val, ensemble_val_preds)
+
+            dfd = Ensemble.distinct_failure_diversity(ensemble.val_preds, self.y_val)
+
+            z = 0
 
             try:
-                reporter.save_accuracy(self.generate, g, dummy_weight_vector, ConversorIterator(P), classifiers)
-                reporter.save_population(self.generate, P, g)
+                reporter.save_accuracy(self.generate, g, ensemble)
+                reporter.save_population(self.generate, g, ensemble.features)
                 reporter.save_gm(self.generate, g, gm)
             except AttributeError:
                 pass
 
             print 'generation %2.d: ens val acc: %.4f dfd: %.4f median: (%.4f, %.4f) time elapsed: %f' % (
-                g, ensemble_val_acc, dfd, medians[0], medians[1], (t2 - t1).total_seconds()
+                g, ensemble_val_acc, dfd, medians[0], medians[1], (dt.now() - t1).total_seconds()
             )
-            t1 = t2
-            g += 1
 
         try:
             reporter.save_population(self.generate, P)
         except AttributeError:
             pass
 
+        A_index = np.flatnonzero(A)
+
         features = np.array(map(lambda x: x.tolist(), P))
-        return classifiers, features, P_fitness
+        return classifiers[A_index], features[A_index], P_fitness[A_index]
