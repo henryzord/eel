@@ -27,34 +27,26 @@ def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None)
         base_classifier=clf
     )
 
-    classifiers, features, fitness = gen_inst.generate(
+    ensemble = gen_inst.generate(
         n_classifiers=params['generation']['n_individuals'],
         n_generations=params['generation']['n_generations'],
         selection_strength=params['generation']['selection_strength'],
         reporter=reporter
-    )
+    )  # type: Ensemble
 
-    val_predictions = get_predictions(classifiers, features, X_val)
-    test_predictions = get_predictions(classifiers, features, X_test)
-
-    selected_classifiers = select(
-        features=features, classifiers=classifiers,
-        val_predictions=val_predictions, y_val=y_val,
+    ensemble = select(  # TODO implement!
+        ensemble=ensemble,
+        X_val=X_val, y_val=y_val,
         n_individuals=params['selection']['n_individuals'],
         n_generations=params['selection']['n_generations'],
         reporter=reporter
     )
 
-    raise NotImplementedError('not implemented yet!')
-
-    best_classifiers = np.ones(len(classifiers), dtype=np.bool)
-    _best_weights = np.ones((len(best_classifiers), len(np.unique(y_val))), dtype=np.float32)
-
     '''
         Now testing
     '''
 
-    y_test_pred = get_classes(_best_weights, test_predictions[np.where(best_classifiers)])
+    y_test_pred = ensemble.predict(X_test)
     return y_test_pred
 
 

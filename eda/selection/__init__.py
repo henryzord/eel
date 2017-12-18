@@ -1,14 +1,9 @@
-from datetime import datetime as dt
-
 import numpy as np
+from datetime import datetime as dt
+from eda import Ensemble
 
-from eda import get_fronts
 
-
-def select(
-        features, classifiers, val_predictions, y_val,
-        n_individuals=100, n_generations=100, reporter=None
-):
+def select(ensemble, X_val, y_val, n_individuals=100, n_generations=100, reporter=None):
     """
     Select an ensemble of classifiers.
 

@@ -186,10 +186,13 @@ class Ensemble(object):
 
         X_features = X.columns
 
-        if preds is None:
-            preds = np.empty((self.n_classifiers, X.shape[0]), dtype=np.int32)
+        n_activated = np.count_nonzero(self.activated)
+        index_activated = np.flatnonzero(self.activated)
 
-        for j in xrange(self.n_classifiers):  # number of base classifiers
+        if preds is None:
+            preds = np.empty((n_activated, X.shape[0]), dtype=np.int32)
+
+        for j in index_activated:  # number of base classifiers
             selected_features = X_features[np.flatnonzero(self.features[j])]
             preds[j, :] = self.classifiers[j].predict(X[selected_features])
 
@@ -202,7 +205,7 @@ class Ensemble(object):
         :param preds: optional - matrix where each row is a classifier and each column an instance.
         :return: An array where each position contains the ensemble prediction for that instance.
         """
-        preds = self.get_predictions(X, preds)
+        preds = self.get_predictions(X, preds=preds)
 
         n_classifiers, n_classes = self.voting_weights.shape
         n_classifiers, n_instances = preds.shape
@@ -293,43 +296,44 @@ class Reporter(object):
     def __get_hash__(self, func):
         return hash(func.__name__ + str(self.fold))
 
-    def save_accuracy(self, func, gen, ensemble):
+    def save_accuracy(self, func, gen, ensembles):
         """
 
+        :dtype func: function
         :param func: function that is calling this method.
+        :dtype gen: int
         :param gen: current generation.
-        :param weights: voting weights.
-        :param features:
-        :param classifiers:
-        :return:
+        :dtype ensembles: list
+        :param ensembles:
         """
 
-        # self.__save_accuracy__(func, gen, weights, features, classifiers, dict())
-        p = Process(
-            target=self.__save_accuracy__, args=(
-                func, gen, ensemble, self.report_lock
-            )
-        )
-        self.processes += [p]
-        p.start()
+        self.__save_accuracy__(func, gen, ensembles, self.report_lock)
+        # p = Process(
+        #     target=self.__save_accuracy__, args=(
+        #         func, gen, ensembles, self.report_lock
+        #     )
+        # )
+        # self.processes += [p]
+        # p.start()
 
-    def save_population(self, func, population, gen=1):
-        # self.__save_population__(self.output_path, self.date, func, population, dict())
-        p = Process(
-            target=self.__save_population__,
-            args=(self.output_path, self.date, func, population, self.population_lock)
-        )
-        self.processes += [p]
-        p.start()
+    def save_population(self, func, ensembles):
+        self.__save_population__(self.output_path, self.date, func, ensembles, self.population_lock)
+        # p = Process(
+        #     target=self.__save_population__,
+        #     args=(self.output_path, self.date, func, population, self.population_lock)
+        # )
+        # self.processes += [p]
+        # p.start()
 
     def save_gm(self, func, gen, gm):
-        p = Process(
-            target=self.__save_gm__, args=(
-                func, gen, gm, self.gm_lock
-            )
-        )
-        self.processes += [p]
-        p.start()
+        self.__save_gm__(func, gen, gm, self.gm_lock)
+        # p = Process(
+        #     target=self.__save_gm__, args=(
+        #         func, gen, gm, self.gm_lock
+        #     )
+        # )
+        # self.processes += [p]
+        # p.start()
 
     def __save_gm__(self, func, gen, gm, lock):
         """
@@ -358,11 +362,15 @@ class Reporter(object):
 
         lock.release()
 
-    def __save_accuracy__(self, caller, gen, ensemble, lock):
+    def __save_accuracy__(self, caller, gen, ensembles, lock):
         """
 
-        :param caller:
-        :param gen:
+        :dtype caller: function
+        :param caller: function that is calling this method.
+        :dtype gen: int
+        :param gen: current generation.
+        :dtype ensembles: list
+        :param ensembles: A list of the ensembles which will have their accuracy recorded.
         :type lock: multiprocessing.Lock
         :param lock:
         :return:
@@ -372,15 +380,13 @@ class Reporter(object):
 
         n_sets = len(self.Xs)
 
-        accs = np.empty(n_sets * ensemble.n_classifiers, dtype=np.float32)
-
-        raise NotImplementedError('not implemented yet!')
+        n_ensembles = len(ensembles)
+        accs = np.empty(n_sets * len(ensembles), dtype=np.float32)
 
         counter = 0
-        for weight_set in ensemble.voting_weights:
+        for ensemble in ensembles:
             for j, (X, y) in enumerate(it.izip(self.Xs, self.ys)):
-                preds = get_predictions(classifiers, features, X)
-                classes = get_classes(weight_set, preds)
+                classes = ensemble.predict(X)
                 acc = accuracy_score(y, classes)
                 accs[counter] = acc
                 counter += 1
@@ -394,11 +400,12 @@ class Reporter(object):
                 writer.writerow(
                     ['method', 'fold', 'run', 'generation', 'individual', 'set_name', 'set_size', 'accuracy'])
 
+        # raise NotImplementedError('not implemented yet!')
         counter = 0
         with open(output, 'a') as f:
             writer = csv.writer(f, delimiter=',')
 
-            for i in xrange(n_individuals):
+            for i in xrange(n_ensembles):
                 for j in xrange(n_sets):
                     writer.writerow(
                         [caller.__name__, self.fold, self.run, str(gen), str(i), self.set_names[j], self.set_sizes[j],
@@ -407,13 +414,13 @@ class Reporter(object):
 
         lock.release()
 
-    def __save_population__(self, output_path, date, func, population, lock):
+    def __save_population__(self, output_path, date, func, ensembles, lock):
         """
 
         :param output_path:
         :param date:
         :param func:
-        :param population:
+        :param ensembles:
         :type lock: multiprocessing.Lock
         :param lock:
         :return:
@@ -422,9 +429,9 @@ class Reporter(object):
         lock.acquire()
 
         if func.__name__ == 'generate':
-            dense = np.array(map(lambda x: x.tolist(), population))
+            dense = np.array(map(lambda x: x.tolist(), ensembles))
         else:
-            dense = population
+            dense = ensembles
 
         pd.DataFrame(dense).to_csv(
             os.path.join(output_path, date + '_' + 'population' + '_' + func.__name__ + '.csv'),

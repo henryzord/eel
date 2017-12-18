@@ -217,25 +217,27 @@ class EnsembleGenerator(object):
 
             dfd = Ensemble.distinct_failure_diversity(ensemble.val_preds, self.y_val)
 
-            z = 0
-
-            try:
-                reporter.save_accuracy(self.generate, g, ensemble)
-                reporter.save_population(self.generate, g, ensemble.features)
-                reporter.save_gm(self.generate, g, gm)
-            except AttributeError:
-                pass
+            # try:
+            reporter.save_accuracy(self.generate, g, [ensemble])
+            reporter.save_population(self.generate, ensemble.features)
+            reporter.save_gm(self.generate, g, gm)
+            # except AttributeError:
+            #     pass
 
             print 'generation %2.d: ens val acc: %.4f dfd: %.4f median: (%.4f, %.4f) time elapsed: %f' % (
                 g, ensemble_val_acc, dfd, medians[0], medians[1], (dt.now() - t1).total_seconds()
             )
 
         try:
-            reporter.save_population(self.generate, P)
+            reporter.save_population(self.generate, ensemble.features)
         except AttributeError:
             pass
 
-        A_index = np.flatnonzero(A)
+        return ensemble
+        # A = self.__get_elite__(P_fitness, A=A)
+        # A_index = np.flatnonzero(A)
 
-        features = np.array(map(lambda x: x.tolist(), P))
-        return classifiers[A_index], features[A_index], P_fitness[A_index]
+        # ensemble.activated = A
+        # return A
+        # features = np.array(map(lambda x: x.tolist(), ensemble.features))
+        # return np.array(ensemble.classifiers)[A_index], features[A_index], P_fitness[A_index]
