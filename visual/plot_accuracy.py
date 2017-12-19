@@ -48,7 +48,7 @@ def main():
             integrate_df = pd.read_csv(os.path.join(path_read, _file), sep=',')
         elif '_report_generate' in _file:
             generate_df = pd.read_csv(os.path.join(path_read, _file), sep=',')
-        elif '_eda_select' in _file:
+        elif '_report_select' in _file:
             select_df = pd.read_csv(os.path.join(path_read, _file), sep=',')
 
     step_names = filter(

@@ -34,6 +34,10 @@ def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None)
         reporter=reporter
     )  # type: Ensemble
 
+    print '-------------------------------------------------------'
+    print '--------------------- selection -----------------------'
+    print '-------------------------------------------------------'
+
     ensemble = select(  # TODO implement!
         ensemble=ensemble,
         X_val=X_val, y_val=y_val,

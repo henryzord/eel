@@ -1,81 +1,101 @@
 import numpy as np
 from datetime import datetime as dt
+
+from sklearn.metrics import accuracy_score
+
 from eda import Ensemble
+import copy
+from eda.selection.graphical_model import GraphicalModel
+
+
+def get_selection_fitness(P, y_true):
+    pass
+
+
+def __get_elite__(P_fitness, A=None):
+    median = np.median(P_fitness, axis=0)
+
+    if A is None:
+        A = P_fitness > median
+    else:
+        A[:] = P_fitness > median
+    return A
+
+
+def __update__(P, A, gm):
+    """
+
+    :param A:
+    :param P:
+    :param gm: eda.selection.graphical_model.GraphicalModel
+    :return:
+    """
+
+    gm = gm.update(P, A)
+    return gm
 
 
 def select(ensemble, X_val, y_val, n_individuals=100, n_generations=100, reporter=None):
     """
     Select an ensemble of classifiers.
 
-    :param features:
-    :param classifiers:
-    :param val_predictions:
-    :param y_val:
-    :param n_individuals:
-    :param n_generations:
+    :param X_val: X for validation set.
+    :param y_val: y for validation set.
+    :param n_individuals: optional - number of individuals. Defaults to 100.
+    :param n_generations: optional - number of generations. Defaults to 100.
     :type reporter: eda.Reporter
-    :param reporter:
-    :return:
+    :param reporter: optional - reporter for storing data about the evolutionary process.
+        Defaults to None (no recording).
+    :return: The best combination of base classifiers found.
     """
 
-    n_classifiers, n_features = features.shape
-    n_objectives = 2
+    n_classifiers = ensemble.n_classifiers
 
-    gm = np.full(n_classifiers, 0.5, dtype=np.float32)
-    sel_pop = np.empty((n_individuals, n_classifiers), dtype=np.bool)
-    fitness = np.empty((n_individuals, n_objectives), dtype=np.float32)
-
-    n_classes = len(np.unique(y_val))
-
-    dummy_weights = np.empty(
-        (n_individuals, n_classifiers, n_classes),
-        dtype=np.float32
-    )
+    gm = GraphicalModel(variable_names=range(n_classifiers), available_values=[0, 1])
+    P = [copy.deepcopy(ensemble) for i in xrange(n_individuals)]
+    P_fitness = np.empty(n_individuals, dtype=np.float32)
+    A = np.zeros(n_individuals, dtype=np.int32)
 
     t1 = dt.now()
 
     for g in xrange(n_generations):
         for i in xrange(n_individuals):
-            for j in xrange(n_classifiers):
-                sel_pop[i, j] = np.random.choice(a=[True, False], p=[gm[j], 1. - gm[j]])
-                dummy_weights[i, j, :] = sel_pop[i, j]
+            if not A[i]:
+                P[i] = gm.sample(P[i])
+                P_fitness[i] = P[i].dfd(X=X_val, y=y_val, preds=P[i].val_preds)
 
-            fitness[i, :] = get_selection_fitness(val_predictions[sel_pop[i]], y_val)
+        # try:
+        reporter.save_accuracy(select, g, P)
+        reporter.save_population(select, P[np.argmax(P_fitness)].features)
+        # reporter.save_gm(select, g, gm)  # TODO save GM in later iterations!
+        # except AttributeError:
+        #     pass
 
-        try:
-            reporter.save_accuracy(select, g, dummy_weights, features, classifiers)
-            reporter.save_population(select, sel_pop, g)
-        except AttributeError:
-            pass
+        A = __get_elite__(P_fitness, A=A)
 
-        medians = np.median(fitness, axis=0)
-        means = np.mean(fitness, axis=0)
+        best_individual = P[np.argmax(P_fitness)]
+        ensemble_val_acc = accuracy_score(y_val, best_individual.predict(X_val, preds=best_individual.val_preds))
+        dfd = best_individual.dfd(X_val, y_val, preds=best_individual.val_preds)
 
-        # individuals with fitness equal or higher than median
-        selected = np.multiply.reduce(fitness >= medians, axis=1)
-
-        if np.count_nonzero(selected) == 0:
-            print 'no individual is better than median; aborting...'
+        if np.max(A) == 0:
             break
+
+        medians = np.median(P_fitness, axis=0)
+        gm = __update__(P, A, gm)
 
         t2 = dt.now()
 
-        print 'generation %2.d: median: (%.4f, %.4f) mean: (%.4f, %.4f) time elapsed: %f' % (
-            g, medians[0], medians[1], means[0], means[1], (t2 - t1).total_seconds()
+        print 'generation %2.d: ens val acc: %.4f dfd: %.4f median: %.4f time elapsed: %f' % (
+            g, ensemble_val_acc, dfd, medians, (dt.now() - t1).total_seconds()
         )
+
         t1 = t2
 
-        gm = __pareto_encode_gm__(selected, sel_pop, fitness)
+    best_individual = P[np.argmax(P_fitness)]
 
-    # medians = np.median(fitness, axis=0)
-    # selected = np.multiply.reduce(fitness >= medians, axis=1)
-
-    fronts = get_fronts(fitness)
     try:
-        reporter.save_population(select, sel_pop)
+        reporter.save_population(select, best_individual.features)
     except AttributeError:
         pass
 
-    # first individual from first front, which is the most sparse in comparison to other individuals
-    raise NotImplementedError('not implemented yet!')
-    return fronts[0][0]
+    return best_individual

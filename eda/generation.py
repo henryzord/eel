@@ -217,12 +217,12 @@ class EnsembleGenerator(object):
 
             dfd = Ensemble.distinct_failure_diversity(ensemble.val_preds, self.y_val)
 
-            # try:
-            reporter.save_accuracy(self.generate, g, [ensemble])
-            reporter.save_population(self.generate, ensemble.features)
-            reporter.save_gm(self.generate, g, gm)
-            # except AttributeError:
-            #     pass
+            try:
+                reporter.save_accuracy(self.generate, g, [ensemble])
+                reporter.save_population(self.generate, ensemble.features)
+                reporter.save_gm(self.generate, g, gm)
+            except AttributeError:
+                pass
 
             print 'generation %2.d: ens val acc: %.4f dfd: %.4f median: (%.4f, %.4f) time elapsed: %f' % (
                 g, ensemble_val_acc, dfd, medians[0], medians[1], (dt.now() - t1).total_seconds()

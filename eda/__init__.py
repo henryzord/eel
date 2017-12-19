@@ -192,9 +192,9 @@ class Ensemble(object):
         if preds is None:
             preds = np.empty((n_activated, X.shape[0]), dtype=np.int32)
 
-        for j in index_activated:  # number of base classifiers
+        for raw, j in enumerate(index_activated):  # number of base classifiers
             selected_features = X_features[np.flatnonzero(self.features[j])]
-            preds[j, :] = self.classifiers[j].predict(X[selected_features])
+            preds[raw, :] = self.classifiers[j].predict(X[selected_features])
 
         return preds
 
@@ -222,6 +222,11 @@ class Ensemble(object):
             global_votes[i] = np.argmax(local_votes)
 
         return global_votes
+
+    def dfd(self, X, y, preds=None):
+        preds = self.get_predictions(X, preds)
+        _dfd = self.distinct_failure_diversity(preds, y)
+        return _dfd
 
     @staticmethod
     def distinct_failure_diversity(predictions, y_true):

@@ -6,14 +6,14 @@
   "n_runs": 3,
   "metaparams": {
     "generation": {
-      "n_individuals": 200,
-      "n_generations": 50,
+      "n_individuals": 100,
+      "n_generations": 10,
       "selection_strength": 0.5,
       "verbose": true
     },
     "selection": {
-      "n_individuals": 10,
-      "n_generations": 2,
+      "n_individuals": 100,
+      "n_generations": 10,
       "verbose": true
     },
     "integration": {

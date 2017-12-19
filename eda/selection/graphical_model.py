@@ -114,6 +114,7 @@ class Variable(object):
         self.probs /= np.sum(count.values())
 
         self.__add_rest__()
+        return self
 
 
 class GraphicalModel(Graph):
@@ -150,7 +151,7 @@ class GraphicalModel(Graph):
         ordered_values = sorted(values.items(), key=lambda x: x[0])
         names, sampled = zip(*ordered_values)
 
-        individual.colors = list(sampled)
+        individual.activated = np.array(sampled)
 
         return individual
 
@@ -211,19 +212,26 @@ class GraphicalModel(Graph):
 
         return correlation
 
-    def update(self, fittest):
+    def update(self, P, parents):
         """
         Updates this graphical model, inplace.
 
-        :type fittest: list
-        :param fittest:
+        :type P: list
+        :param P: population of individuals
+        :type parents: list
+        :param parents: an boolean array denoting the individuals in
+            which characteristics will be used to update the GM.
         :return:
         """
 
-        n_fittest = len(fittest)
+        n_individuals = len(P)
+        n_fittest = np.count_nonzero(parents)
         genotype = np.empty((n_fittest, self.n_variables), dtype=np.object)
-        for i in xrange(n_fittest):
-            genotype[i, :] = fittest[i].colors
+        raw = 0
+        for i in xrange(n_individuals):
+            if parents[i]:
+                genotype[raw, :] = P[i].activated
+                raw += 1
 
         self.dependencies = self.__check_correlation__(self.available_values, genotype, self.dependencies)
 
@@ -260,6 +268,7 @@ class GraphicalModel(Graph):
 
             self.sampling_order[n_added] = arg_max
             n_added += 1
+        return self
 
     def plot(self, title=''):
         super(GraphicalModel, self).plot(title)
