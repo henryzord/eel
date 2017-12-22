@@ -1,25 +1,25 @@
 {
-  "full_path": "/home/henry/Projects/eel/datasets/uci/semeion.arff",
-  "random_state": 0,
-  "n_folds": 3,
-  "reporter_output": "/home/henry/Projects/eel/metadata",
-  "n_runs": 3,
+  "reporter_output": "/home/henry/Projects/eel/metadata/column_2C_weka", 
   "metaparams": {
     "generation": {
-      "n_individuals": 100,
-      "n_generations": 10,
-      "selection_strength": 0.5,
-      "verbose": true
-    },
+      "selection_strength": 0.5, 
+      "n_generations": 1, 
+      "verbose": true, 
+      "n_individuals": 100
+    }, 
     "selection": {
-      "n_individuals": 100,
-      "n_generations": 10,
-      "verbose": true
-    },
+      "n_generations": 25, 
+      "verbose": true, 
+      "n_individuals": 100
+    }, 
     "integration": {
-      "n_individuals": 10,
-      "n_generations": 0,
-      "verbose": true
+      "n_generations": 0, 
+      "verbose": true, 
+      "n_individuals": 10
     }
-  }
+  }, 
+  "random_state": 0, 
+  "n_folds": 5, 
+  "n_runs": 10, 
+  "full_path": "/home/henry/Projects/eel/datasets/uci/column_2C_weka.arff"
 }

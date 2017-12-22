@@ -125,7 +125,7 @@ class Ensemble(object):
 
         selected_features = self.feature_names[feature_index]
 
-        if len(feature_index) <= 0:
+        if np.max(feature_index) == 0:
             model = DummyClassifier()
         else:
             model = model.fit(self.X_train[selected_features], self.y_train)

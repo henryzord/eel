@@ -36,7 +36,7 @@ def __plot__(data, df):
 def main():
     off.init_notebook_mode()
     output_name = 'accuracy.html'
-    path_read = '/home/henry/Projects/eel/metadata'
+    path_read = '/home/henry/Projects/eel/metadata/breastCancer'
 
     generate_df = pd.DataFrame([])
     select_df = pd.DataFrame([])
