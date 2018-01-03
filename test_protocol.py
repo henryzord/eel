@@ -1,5 +1,8 @@
+"""
+Tests several datasets and store the results.
+"""
+
 import sys, os
-import warnings
 import json
 
 __author__ = 'Henry Cagnini'
