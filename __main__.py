@@ -28,25 +28,24 @@ def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None)
         base_classifier=clf
     )
 
-    # ensemble = gen_inst.rf_generate(
-    #     n_classifiers=params['generation']['n_individuals'],
-    #     n_generations=params['generation']['n_generations'],
-    #     selection_strength=params['generation']['selection_strength'],
-    #     reporter=reporter
-    # )  # type: Ensemble
-
-    ensemble = gen_inst.generate(
+    ensemble = gen_inst.rf_generate(
         n_classifiers=params['generation']['n_individuals'],
         n_generations=params['generation']['n_generations'],
         selection_strength=params['generation']['selection_strength'],
         reporter=reporter
     )  # type: Ensemble
 
-    print '-------------------------------------------------------'
-    print '--------------------- selection -----------------------'
-    print '-------------------------------------------------------'
+    # ensemble = gen_inst.generate(
+    #     n_classifiers=params['generation']['n_individuals'],
+    #     n_generations=params['generation']['n_generations'],
+    #     selection_strength=params['generation']['selection_strength'],
+    #     reporter=reporter
+    # )  # type: Ensemble
 
-    if params['selection']['n_generations'] > 1:
+    if params['selection']['n_generations'] > 0:
+        print '-------------------------------------------------------'
+        print '--------------------- selection -----------------------'
+        print '-------------------------------------------------------'
         ensemble = select(
             ensemble=ensemble,
             X_val=X_val, y_val=y_val,
@@ -55,11 +54,10 @@ def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None)
             reporter=reporter
         )
 
-    print '-------------------------------------------------------'
-    print '--------------------- integration ---------------------'
-    print '-------------------------------------------------------'
-
-    if params['integration']['n_generations'] > 1:
+    if params['integration']['n_generations'] > 0:
+        print '-------------------------------------------------------'
+        print '--------------------- integration ---------------------'
+        print '-------------------------------------------------------'
         ensemble = integrate(
             ensemble=ensemble,
             X_val=X_val, y_val=y_val,

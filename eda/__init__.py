@@ -212,6 +212,22 @@ class Ensemble(object):
 
         return preds
 
+    def predict_prob(self, X, preds=None):
+        preds = self.get_predictions(X, preds=preds)
+
+        n_classifiers, n_classes = self.voting_weights.shape
+        n_classifiers, n_instances = preds.shape
+
+        global_votes = np.zeros((n_instances, n_classes), dtype=np.float32)
+
+        for i in xrange(n_instances):
+            for j in xrange(n_classifiers):
+                global_votes[i, preds[j, i]] += self.voting_weights[j, preds[j, i]]
+
+        _sum = np.sum(global_votes, axis=1)
+
+        return global_votes / _sum[:, None]
+
     def predict(self, X, preds=None):
         """
 

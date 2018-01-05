@@ -10,9 +10,9 @@ def __get_elite__(P_fitness, A=None):
     median = np.median(P_fitness, axis=0)
 
     if A is None:
-        A = P_fitness > median
+        A = P_fitness >= median
     else:
-        A[:] = P_fitness > median
+        A[:] = P_fitness >= median
     return A
 
 
@@ -50,12 +50,12 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
         Defaults to None (no recording).
     :return: The best combination of base classifiers found.
     """
-
     n_classifiers = ensemble.n_classifiers
     n_classes = ensemble.n_classes
 
-    loc = np.random.normal(loc=0.5, scale=1., size=(n_classifiers, n_classes)).astype(dtype=np.float32)
+    import warnings
     scale = 0.5
+    loc = np.random.normal(loc=1., scale=scale, size=(n_classifiers, n_classes)).astype(dtype=np.float32)
 
     P = [copy.deepcopy(ensemble) for i in xrange(n_individuals)]
     P_fitness = np.empty(n_individuals, dtype=np.float32)
@@ -63,14 +63,24 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
 
     t1 = dt.now()
 
+    val_arange = np.arange(len(X_val))
+    train_arange = np.arange(len(ensemble.X_train))
+
     for g in xrange(n_generations):
         for i in xrange(n_individuals):
             if not A[i]:
                 for j in xrange(P[i].n_classifiers):
                     for c in xrange(n_classes):
-                        P[i].voting_weights[j][c] = np.random.normal(loc=loc[j][c], scale=scale)
+                        P[i].voting_weights[j][c] = np.clip(np.random.normal(loc=loc[j][c], scale=scale), a_min=0., a_max=1.)
 
-                P_fitness[i] = P[i].dfd(X=X_val, y=y_val, preds=P[i].val_preds)
+                warnings.warn('WARNING: using difference to correct class as fitness!')
+                val_probs = P[i].predict_prob(X_val, preds=P[i].val_preds)
+                train_probs = P[i].predict_prob(P[i].X_train, preds=P[i].train_preds)
+                P_fitness[i] = (
+                    val_probs[val_arange, P[i].y_val.values].sum() +
+                    train_probs[train_arange, P[i].y_train.values].sum()
+                ) / 2.
+                # P_fitness[i] = P[i].dfd(X=X_val, y=y_val, preds=P[i].val_preds)
 
         try:
             reporter.save_accuracy(integrate, g, P)
