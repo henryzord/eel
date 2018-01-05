@@ -2,10 +2,8 @@ import numpy as np
 from datetime import datetime as dt
 
 from sklearn.metrics import accuracy_score
-
 from eda import Ensemble
 import copy
-from eda.selection.graphical_model import GraphicalModel
 
 
 def __get_elite__(P_fitness, A=None):
@@ -18,20 +16,28 @@ def __get_elite__(P_fitness, A=None):
     return A
 
 
-def __update__(P, A, gm):
+def __update__(P, A, loc):
     """
 
     :param A:
     :param P:
-    :param gm: eda.selection.graphical_model.GraphicalModel
+    :param loc: numpy.ndarray
     :return:
     """
+    loc[:] = 0.
 
-    gm = gm.update(P, A)
-    return gm
+    n_elite = np.count_nonzero(A)
+
+    for i in xrange(len(A)):
+        if A[i]:
+            loc += P[i].voting_weights
+
+    loc[:] /= float(n_elite)
+
+    return loc
 
 
-def select(ensemble, X_val, y_val, n_individuals=100, n_generations=100, reporter=None):
+def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, reporter=None):
     """
     Select an ensemble of classifiers.
 
@@ -46,8 +52,11 @@ def select(ensemble, X_val, y_val, n_individuals=100, n_generations=100, reporte
     """
 
     n_classifiers = ensemble.n_classifiers
+    n_classes = ensemble.n_classes
 
-    gm = GraphicalModel(variable_names=range(n_classifiers), available_values=[0, 1])
+    loc = np.random.normal(loc=0.5, scale=1., size=(n_classifiers, n_classes)).astype(dtype=np.float32)
+    scale = 0.5
+
     P = [copy.deepcopy(ensemble) for i in xrange(n_individuals)]
     P_fitness = np.empty(n_individuals, dtype=np.float32)
     A = np.zeros(n_individuals, dtype=np.int32)
@@ -57,18 +66,23 @@ def select(ensemble, X_val, y_val, n_individuals=100, n_generations=100, reporte
     for g in xrange(n_generations):
         for i in xrange(n_individuals):
             if not A[i]:
-                P[i] = gm.sample(P[i])
+                for j in xrange(P[i].n_classifiers):
+                    for c in xrange(n_classes):
+                        P[i].voting_weights[j][c] = np.random.normal(loc=loc[j][c], scale=scale)
+
                 P_fitness[i] = P[i].dfd(X=X_val, y=y_val, preds=P[i].val_preds)
+
         try:
-            reporter.save_accuracy(select, g, P)
-            reporter.save_population(select, P[np.argmax(P_fitness)].truth_features)
-            # reporter.save_gm(select, g, gm)  # TODO save GM in later iterations!
+            reporter.save_accuracy(integrate, g, P)
+            reporter.save_population(integrate, P[np.argmax(P_fitness)].voting_weights)
+            reporter.save_gm(integrate, g, loc)
         except AttributeError:
             pass
 
         A = __get_elite__(P_fitness, A=A)
 
         best_individual = P[np.argmax(P_fitness)]
+
         ensemble_val_acc = accuracy_score(y_val, best_individual.predict(X_val, preds=best_individual.val_preds))
         dfd = best_individual.dfd(X_val, y_val, preds=best_individual.val_preds)
 
@@ -76,7 +90,7 @@ def select(ensemble, X_val, y_val, n_individuals=100, n_generations=100, reporte
             break
 
         medians = np.median(P_fitness, axis=0)
-        gm = __update__(P, A, gm)
+        loc = __update__(P, A, loc)
 
         t2 = dt.now()
 
@@ -89,7 +103,7 @@ def select(ensemble, X_val, y_val, n_individuals=100, n_generations=100, reporte
     best_individual = P[np.argmax(P_fitness)]
 
     try:
-        reporter.save_population(select, best_individual.truth_features)
+        reporter.save_population(integrate, P[np.argmax(P_fitness)].voting_weights)
     except AttributeError:
         pass
 

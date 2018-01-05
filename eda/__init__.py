@@ -65,19 +65,19 @@ class Ensemble(object):
         self.n_classifiers = len(self.classifiers)
 
         if features is not None:
-            self.features = features
+            self.truth_features = features
         elif n_features is not None:
-            self.features = np.zeros(
+            self.truth_features = np.zeros(
                 (n_classifiers, n_features), dtype=np.int32
             )
         else:
             raise ValueError('Either a list of activated features or the number of features must be provided!')
         # finally:
-        self.n_features = len(self.features[0])
+        self.n_features = len(self.truth_features[0])
 
         self.X_train = X_train
-        self.X_val = X_val
         self.y_train = y_train
+        self.X_val = X_val
         self.y_val = y_val
         self.feature_names = self.X_train.columns
 
@@ -108,9 +108,23 @@ class Ensemble(object):
         raise NotImplementedError('not implemented yet!')
 
     def get_genotype(self, index):
-        return self.features[index, :]
+        return self.truth_features[index, :]
 
-    def set_classifier(self, index, base_classifier, feature_index):
+    def set_classifier(self, index, model, truth_features):
+        assert index < self.n_classifiers, \
+            ValueError('index must be a value lesser than the number of total classifiers!')
+
+        selected_features = self.feature_names[truth_features]
+
+        self.classifiers[index] = model
+
+        self.truth_features[index, :] = truth_features
+        self.train_preds[index, :] = model.predict(self.X_train[selected_features])
+        self.val_preds[index, :] = model.predict(self.X_val[selected_features])
+
+        return self
+
+    def train_classifier_with_features(self, index, base_classifier, feature_index):
         """
 
         :param index: classifier to be replaced.
@@ -132,7 +146,7 @@ class Ensemble(object):
 
         self.classifiers[index] = model
 
-        self.features[index, :] = feature_index
+        self.truth_features[index, :] = feature_index
         self.train_preds[index, :] = model.predict(self.X_train[selected_features])
         self.val_preds[index, :] = model.predict(self.X_val[selected_features])
 
@@ -193,7 +207,7 @@ class Ensemble(object):
             preds = np.empty((n_activated, X.shape[0]), dtype=np.int32)
 
         for raw, j in enumerate(index_activated):  # number of base classifiers
-            selected_features = X_features[np.flatnonzero(self.features[j])]
+            selected_features = X_features[np.flatnonzero(self.truth_features[j])]
             preds[raw, :] = self.classifiers[j].predict(X[selected_features])
 
         return preds

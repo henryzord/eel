@@ -14,6 +14,7 @@ from eda import Ensemble, get_fronts
 from sklearn.metrics import accuracy_score
 
 from utils import flatten
+from sklearn.ensemble import RandomForestClassifier
 
 
 class ConversorIterator(object):
@@ -132,7 +133,7 @@ class EnsembleGenerator(object):
                     P[j][k] = np.random.choice(a=[0, 1], p=[1. - gm[k], gm[k]])
 
             feature_index = list(P[j])
-            ensemble = ensemble.set_classifier(index=j, base_classifier=self.base_classifier, feature_index=feature_index)
+            ensemble = ensemble.train_classifier_with_features(index=j, base_classifier=self.base_classifier, feature_index=feature_index)
 
         return ensemble
 
@@ -219,7 +220,7 @@ class EnsembleGenerator(object):
 
             try:
                 reporter.save_accuracy(self.generate, g, [ensemble])
-                reporter.save_population(self.generate, ensemble.features)
+                reporter.save_population(self.generate, ensemble.truth_features)
                 reporter.save_gm(self.generate, g, gm)
             except AttributeError:
                 pass
@@ -229,7 +230,7 @@ class EnsembleGenerator(object):
             )
 
         try:
-            reporter.save_population(self.generate, ensemble.features)
+            reporter.save_population(self.generate, ensemble.truth_features)
         except AttributeError:
             pass
 
@@ -241,3 +242,60 @@ class EnsembleGenerator(object):
         # return A
         # features = np.array(map(lambda x: x.tolist(), ensemble.features))
         # return np.array(ensemble.classifiers)[A_index], features[A_index], P_fitness[A_index]
+
+    def rf_generate(self, n_classifiers, n_generations, selection_strength, reporter):
+        """
+
+        :param n_classifiers:
+        :param n_generations:
+        :type reporter: eda.Reporter
+        :param reporter:
+        :return:
+        """
+        t1 = dt.now()
+
+        rf = RandomForestClassifier(n_estimators=n_classifiers)
+        rf = rf.fit(self.X_train, self.y_train)
+
+        ensemble = Ensemble.create_base(
+            X_train=self.X_train,
+            X_val=self.X_val,
+            y_train=self.y_train,
+            y_val=self.y_val,
+            base_classifier=self.base_classifier,
+            n_classifiers=n_classifiers,
+            n_features=self.n_features,
+        )
+
+        truth_features = np.ones(self.n_features, dtype=np.bool)
+        for j in xrange(ensemble.n_classifiers):
+            model = rf.estimators_[j]
+            ensemble = ensemble.set_classifier(index=j, model=model, truth_features=truth_features)
+
+        pairwise_double_fault_train = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
+        pairwise_double_fault_val = np.empty((n_classifiers, n_classifiers), dtype=np.float32)
+
+        P_fitness = self.__get_fitness__(
+            ensemble, P_fitness=np.empty((n_classifiers, self.n_objectives), dtype=np.float32),
+            pairwise_double_fault_train=pairwise_double_fault_train,
+            pairwise_double_fault_val=pairwise_double_fault_val
+        )
+
+        medians = np.median(P_fitness, axis=0)
+
+        ensemble_val_preds = ensemble.predict(self.X_val, preds=ensemble.val_preds)
+        ensemble_val_acc = accuracy_score(self.y_val, ensemble_val_preds)
+
+        dfd = Ensemble.distinct_failure_diversity(ensemble.val_preds, self.y_val)
+
+        print 'generation %2.d: ens val acc: %.4f dfd: %.4f median: (%.4f, %.4f) time elapsed: %f' % (
+            0, ensemble_val_acc, dfd, medians[0], medians[1], (dt.now() - t1).total_seconds()
+        )
+
+        try:
+            reporter.save_accuracy(self.generate, 0, [ensemble])
+            reporter.save_population(self.generate, ensemble.features)
+        except AttributeError:
+            pass
+
+        return ensemble

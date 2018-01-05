@@ -9,6 +9,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.tree import DecisionTreeClassifier as clf
 
 from eda import Reporter, Ensemble
+from eda.integration import integrate
 from utils import path_to_dataframe
 from eda.generation import EnsembleGenerator
 from eda.selection import select
@@ -27,6 +28,13 @@ def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None)
         base_classifier=clf
     )
 
+    # ensemble = gen_inst.rf_generate(
+    #     n_classifiers=params['generation']['n_individuals'],
+    #     n_generations=params['generation']['n_generations'],
+    #     selection_strength=params['generation']['selection_strength'],
+    #     reporter=reporter
+    # )  # type: Ensemble
+
     ensemble = gen_inst.generate(
         n_classifiers=params['generation']['n_individuals'],
         n_generations=params['generation']['n_generations'],
@@ -38,13 +46,27 @@ def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None)
     print '--------------------- selection -----------------------'
     print '-------------------------------------------------------'
 
-    ensemble = select(
-        ensemble=ensemble,
-        X_val=X_val, y_val=y_val,
-        n_individuals=params['selection']['n_individuals'],
-        n_generations=params['selection']['n_generations'],
-        reporter=reporter
-    )
+    if params['selection']['n_generations'] > 1:
+        ensemble = select(
+            ensemble=ensemble,
+            X_val=X_val, y_val=y_val,
+            n_individuals=params['selection']['n_individuals'],
+            n_generations=params['selection']['n_generations'],
+            reporter=reporter
+        )
+
+    print '-------------------------------------------------------'
+    print '--------------------- integration ---------------------'
+    print '-------------------------------------------------------'
+
+    if params['integration']['n_generations'] > 1:
+        ensemble = integrate(
+            ensemble=ensemble,
+            X_val=X_val, y_val=y_val,
+            n_individuals=params['integration']['n_individuals'],
+            n_generations=params['integration']['n_generations'],
+            reporter=reporter
+        )
 
     '''
         Now testing
@@ -150,6 +172,3 @@ for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
 print 'adaboost accuracy: %.4f +- %.4f' % (sum(acc_adaboost), np.mean(std_adaboost))
 print 'randomForest accuracy: %.4f +- %.4f' % (sum(acc_randomforest), np.mean(std_randomforest))
 print 'eelem accuracy: %.4f +- %.4f' % (sum(acc_eelem), np.mean(std_eelem))
-
-# if __name__ == '__main__':
-#     main()

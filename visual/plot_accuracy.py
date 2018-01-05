@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.offline as off
 from matplotlib import cm
+import json
 
 
 def __plot__(data, df):
@@ -35,8 +36,10 @@ def __plot__(data, df):
 
 def main():
     off.init_notebook_mode()
+    j = json.load(open('../params.json'))
+
     output_name = 'accuracy.html'
-    path_read = '/home/henry/Projects/eel/metadata/breastCancer'
+    path_read = j['reporter_output']
 
     generate_df = pd.DataFrame([])
     select_df = pd.DataFrame([])
