@@ -130,31 +130,28 @@ for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
 
         n_test = X_test.shape[0]
 
-        adaboost = AdaBoostClassifier(n_estimators=params['metaparams']['generation']['n_individuals'])
-        randomforest = RandomForestClassifier(n_estimators=params['metaparams']['generation']['n_individuals'])
-
-        adaboost = adaboost.fit(X_train_val, y_train_val)  # type: AdaBoostClassifier
-        randomforest = randomforest.fit(X_train_val, y_train_val)  # type: RandomForestClassifier
-
-        preds_eel = eelem(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
+        adaboost = AdaBoostClassifier(n_estimators=params['metaparams']['generation']['n_individuals']).fit(X_train_val, y_train_val)  # type: AdaBoostClassifier
+        randomforest = RandomForestClassifier(n_estimators=params['metaparams']['generation']['n_individuals']).fit(X_train_val, y_train_val)  # type: RandomForestClassifier
 
         preds_adaboost = adaboost.predict(X_test)
         preds_randomforest = randomforest.predict(X_test)
 
-        __acc_eelem = accuracy_score(y_test, preds_eel)
         __acc_adaboost = accuracy_score(y_test, preds_adaboost)
         __acc_randomforest = accuracy_score(y_test, preds_randomforest)
 
-        # -------- accuracy for that run -------- #
-        _run_eelem += [__acc_eelem * (float(n_test) / n_all)]
-        _run_adaboost += [__acc_adaboost * (float(n_test) / n_all)]
-        _run_randomforest += [__acc_randomforest * (float(n_test) / n_all)]
+        _run_adaboost += [__acc_adaboost * (float(n_test) / n_all)]  # accuracy for that run
+        _run_randomforest += [__acc_randomforest * (float(n_test) / n_all)]  # accuracy for that run
 
-        print '------ run accuracies: ------'
-        print '\tadaboost accuracy: %.4f' % _run_adaboost[-1]
-        print '\trandomForest accuracy: %.4f' % _run_randomforest[-1]
-        print '\teelem accuracy: %.4f' % _run_eelem[-1]
-        print '-----------------------------'
+        print '\tadaboost run accuracy: %.4f' % _run_adaboost[-1]
+        print '\trandomForest run accuracy: %.4f' % _run_randomforest[-1]
+
+        preds_eel = eelem(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
+        __acc_eelem = accuracy_score(y_test, preds_eel)
+
+        _run_eelem += [__acc_eelem * (float(n_test) / n_all)]  # accuracy for that run
+
+        print '\teelem run accuracy: %.4f' % _run_eelem[-1]
+        print '------------------------------'
 
     # -------- accuracy for that fold -------- #
     acc_eelem += [np.mean(_run_eelem)]  # the accuracy for eelem in that fold is the mean for N runs
