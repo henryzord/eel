@@ -55,7 +55,7 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
     n_classes = ensemble.n_classes
 
     import warnings
-    scale = 0.5
+    scale = 0.25
     step_decay = 5
     decay = float(scale) / (float(n_generations) / float(step_decay))
     loc = np.random.normal(loc=1., scale=scale, size=(n_classifiers, n_classes)).astype(dtype=np.float32)
@@ -67,9 +67,7 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
     t1 = dt.now()
 
     val_arange = np.arange(len(X_val))
-    train_arange = np.arange(len(ensemble.X_train))
-
-
+    # train_arange = np.arange(len(ensemble.X_train))
 
     for g in xrange(n_generations):
         for i in xrange(n_individuals):
@@ -78,12 +76,9 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
                     for c in xrange(n_classes):
                         P[i].voting_weights[j][c] = np.clip(np.random.normal(loc=loc[j][c], scale=scale), a_min=0., a_max=1.)
 
+                # TODO get only errors!
                 val_probs = P[i].predict_prob(X_val, preds=P[i].val_preds)
-                train_probs = P[i].predict_prob(P[i].X_train, preds=P[i].train_preds)
-                P_fitness[i] = (
-                    val_probs[val_arange, P[i].y_val.values].sum() +
-                    train_probs[train_arange, P[i].y_train.values].sum()
-                ) / 2.
+                P_fitness[i] = val_probs[val_arange, P[i].y_val.values].sum()
 
         try:
             reporter.save_accuracy(integrate, g, P)

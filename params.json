@@ -13,7 +13,7 @@
       "n_individuals": 10
     }, 
     "integration": {
-      "n_generations": 50,
+      "n_generations": 50, 
       "verbose": true, 
       "n_individuals": 200
     }

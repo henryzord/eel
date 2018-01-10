@@ -106,16 +106,17 @@ for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
     _run_adaboost = []
     _run_randomforest = []
     for run in xrange(params['n_runs']):
-
         X_train_val = X.iloc[train_index]
         X_test = X.iloc[test_index]
 
         y_train_val = y.iloc[train_index]
         y_test = y.iloc[test_index]
 
+        import warnings
+        warnings.warn('WARNING: using 10% of set for validation!')
         X_train, X_val, y_train, y_val = train_test_split(
             X_train_val, y_train_val,
-            train_size=0.5, test_size=0.5, random_state=params['random_state']
+            train_size=0.9, test_size=0.1, random_state=params['random_state']
         )
 
         reporter = Reporter(
@@ -142,14 +143,14 @@ for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
         _run_adaboost += [__acc_adaboost * (float(n_test) / n_all)]  # accuracy for that run
         _run_randomforest += [__acc_randomforest * (float(n_test) / n_all)]  # accuracy for that run
 
-        print '\tadaboost run accuracy: %.4f' % _run_adaboost[-1]
-        print '\trandomForest run accuracy: %.4f' % _run_randomforest[-1]
-
         preds_eel = eelem(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
         __acc_eelem = accuracy_score(y_test, preds_eel)
 
         _run_eelem += [__acc_eelem * (float(n_test) / n_all)]  # accuracy for that run
 
+        print '------ run accuracies: -----'
+        print '\tadaboost run accuracy: %.4f' % _run_adaboost[-1]
+        print '\trandomForest run accuracy: %.4f' % _run_randomforest[-1]
         print '\teelem run accuracy: %.4f' % _run_eelem[-1]
         print '------------------------------'
 
