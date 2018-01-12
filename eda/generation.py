@@ -14,7 +14,7 @@ from eda import Ensemble, get_fronts
 from sklearn.metrics import accuracy_score
 
 from utils import flatten
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 
 
 class ConversorIterator(object):
@@ -252,10 +252,25 @@ class EnsembleGenerator(object):
         :param reporter:
         :return:
         """
-        t1 = dt.now()
-
         rf = RandomForestClassifier(n_estimators=n_classifiers)
         rf = rf.fit(self.X_train, self.y_train)
+        ensemble = self.__core_generate__(
+            n_classifiers=n_classifiers, estimators=rf.estimators_, reporter=reporter
+        )
+        return ensemble
+
+    def ada_generate(self, n_classifiers, n_generations, selection_strength, reporter):
+        rf = AdaBoostClassifier(n_estimators=n_classifiers)
+        rf = rf.fit(
+            np.vstack((self.X_train, self.X_val)), np.hstack((self.y_train, self.y_val))
+        )
+        ensemble = self.__core_generate__(
+            n_classifiers=n_classifiers, estimators=rf.estimators_, reporter=reporter
+        )
+        return ensemble
+
+    def __core_generate__(self, n_classifiers, estimators, reporter):
+        t1 = dt.now()
 
         ensemble = Ensemble.create_base(
             X_train=self.X_train,
@@ -269,7 +284,7 @@ class EnsembleGenerator(object):
 
         truth_features = np.ones(self.n_features, dtype=np.bool)
         for j in xrange(ensemble.n_classifiers):
-            model = rf.estimators_[j]
+            model = estimators[j]
             ensemble = ensemble.set_classifier(index=j, model=model, truth_features=truth_features)
 
         pairwise_double_fault_train = np.empty((n_classifiers, n_classifiers), dtype=np.float32)

@@ -1,19 +1,20 @@
-import numpy as np
+import copy
 from datetime import datetime as dt
 
+import numpy as np
 from sklearn.metrics import accuracy_score
+
 from eda import Ensemble
-from sklearn.model_selection import train_test_split
-import copy
 
 
 def __get_elite__(P_fitness, A=None):
-    median = np.median(P_fitness, axis=0)
+    median = np.median(P_fitness)
 
     if A is None:
         A = P_fitness > median
     else:
         A[:] = P_fitness > median
+
     return A
 
 
@@ -54,10 +55,8 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
     n_classifiers = ensemble.n_classifiers
     n_classes = ensemble.n_classes
 
-    import warnings
     scale = 0.25
-    step_decay = 5
-    decay = float(scale) / (float(n_generations) / float(step_decay))
+    decay = scale / float(n_generations)
     loc = np.random.normal(loc=1., scale=scale, size=(n_classifiers, n_classes)).astype(dtype=np.float32)
 
     P = [copy.deepcopy(ensemble) for i in xrange(n_individuals)]
@@ -66,8 +65,9 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
 
     t1 = dt.now()
 
-    val_arange = np.arange(len(X_val))
-    # train_arange = np.arange(len(ensemble.X_train))
+    last_median = 0
+    streak = 0
+    max_streak = 5
 
     for g in xrange(n_generations):
         for i in xrange(n_individuals):
@@ -76,44 +76,61 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
                     for c in xrange(n_classes):
                         P[i].voting_weights[j][c] = np.clip(np.random.normal(loc=loc[j][c], scale=scale), a_min=0., a_max=1.)
 
-                # TODO get only errors!
                 val_probs = P[i].predict_prob(X_val, preds=P[i].val_preds)
-                P_fitness[i] = val_probs[val_arange, P[i].y_val.values].sum()
+                train_probs = P[i].predict_prob(P[i].X_train, preds=P[i].train_preds)
+                argval = np.argmax(val_probs, axis=1)
+                argtrain = np.argmax(train_probs, axis=1)
+                # argwrong, argright = np.flatnonzero(arg != y_val), np.flatnonzero(arg == y_val)
+
+                argright_val = np.flatnonzero(argval == y_val)
+                argright_train = np.flatnonzero(argtrain == P[i].y_train)
+                right_val = np.max(val_probs[argright_val, :], axis=1)
+                right_train = np.max(train_probs[argright_train, :], axis=1)
+                # wrong = np.max(val_probs[argwrong, :], axis=1)
+                P_fitness[i] = (np.sum(right_val) + np.sum(right_train)) / 2.
+
+        A = __get_elite__(P_fitness, A=A)
+        best_individual = P[np.argmax(P_fitness)]  # type: Ensemble
+
+        # raise NotImplementedError('get best individual!')
 
         try:
             reporter.save_accuracy(integrate, g, P)
-            reporter.save_population(integrate, P[np.argmax(P_fitness)].voting_weights)
+            reporter.save_population(integrate, best_individual.voting_weights)
             reporter.save_gm(integrate, g, loc)
         except AttributeError:
             pass
 
-        A = __get_elite__(P_fitness, A=A)
-
-        best_individual = P[np.argmax(P_fitness)]
-
         ensemble_val_acc = accuracy_score(y_val, best_individual.predict(X_val, preds=best_individual.val_preds))
         dfd = best_individual.dfd(X_val, y_val, preds=best_individual.val_preds)
 
+        median = np.median(P_fitness, axis=0)
+
         if np.max(A) == 0:
             break
+        if streak >= max_streak:
+            break
 
-        medians = np.median(P_fitness, axis=0)
+        condition = (abs(last_median - median) < 0.01)
+        streak = (streak * condition) + condition
+        last_median = median
+
         loc = __update__(P, A, loc)
-        if (g % step_decay == 0) and (g > 0):
-            scale -= decay
+        scale -= decay
 
         t2 = dt.now()
 
         print 'generation %2.d: ens val acc: %.4f dfd: %.4f median: %.4f time elapsed: %f' % (
-            g, ensemble_val_acc, dfd, medians, (dt.now() - t1).total_seconds()
+            g, ensemble_val_acc, dfd, median, (dt.now() - t1).total_seconds()
         )
 
         t1 = t2
 
-    best_individual = P[np.argmax(P_fitness)]
+    # A = __get_elite__(P_fitness, A=A)
+    best_individual = P[np.argmax(P_fitness)]  # type: Ensemble
 
     try:
-        reporter.save_population(integrate, P[np.argmax(P_fitness)].voting_weights)
+        reporter.save_population(integrate, best_individual.voting_weights)
     except AttributeError:
         pass
 
