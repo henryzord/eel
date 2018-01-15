@@ -15,6 +15,7 @@ from eda.generation import EnsembleGenerator
 from eda.selection import select
 from xgboost import XGBClassifier
 import os
+from visual.plot_accuracy import make_plot
 
 
 def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
@@ -211,4 +212,4 @@ print 'randomForest accuracy: %.4f +- %.4f' % (sum(acc_randomforest), np.mean(st
 print 'eelem accuracy: %.4f +- %.4f' % (sum(acc_eelem), np.mean(std_eelem))
 print 'xgb accuracy: %.4f +- %.4f' % (sum(acc_xgb), np.mean(std_xgb))
 
-execfile('/home/henry/Projects/eel/visual/plot_accuracy.py')
+make_plot(params['reporter_output'])

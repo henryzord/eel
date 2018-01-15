@@ -11,9 +11,9 @@ def __get_elite__(P_fitness, A=None):
     median = np.median(P_fitness)
 
     if A is None:
-        A = P_fitness > median
+        A = P_fitness < median
     else:
-        A[:] = P_fitness > median
+        A[:] = P_fitness < median
 
     return A
 
@@ -82,15 +82,15 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
                 argtrain = np.argmax(train_probs, axis=1)
                 # argwrong, argright = np.flatnonzero(arg != y_val), np.flatnonzero(arg == y_val)
 
-                argright_val = np.flatnonzero(argval == y_val)
-                argright_train = np.flatnonzero(argtrain == P[i].y_train)
-                right_val = np.max(val_probs[argright_val, :], axis=1)
-                right_train = np.max(train_probs[argright_train, :], axis=1)
+                argwrong_val = np.flatnonzero(argval != y_val)
+                argwrong_train = np.flatnonzero(argtrain != P[i].y_train)
+                wrong_val = np.max(val_probs[argwrong_val, :], axis=1)
+                wrong_train = np.max(train_probs[argwrong_train, :], axis=1)
                 # wrong = np.max(val_probs[argwrong, :], axis=1)
-                P_fitness[i] = (np.sum(right_val) + np.sum(right_train)) / 2.
+                P_fitness[i] = (np.sum(wrong_val) + np.sum(wrong_train)) / 2.
 
         A = __get_elite__(P_fitness, A=A)
-        best_individual = P[np.argmax(P_fitness)]  # type: Ensemble
+        best_individual = P[np.argmin(P_fitness)]  # type: Ensemble
 
         # raise NotImplementedError('get best individual!')
 
@@ -127,7 +127,7 @@ def integrate(ensemble, X_val, y_val, n_individuals=100, n_generations=100, repo
         t1 = t2
 
     # A = __get_elite__(P_fitness, A=A)
-    best_individual = P[np.argmax(P_fitness)]  # type: Ensemble
+    best_individual = P[np.argmin(P_fitness)]  # type: Ensemble
 
     try:
         reporter.save_population(integrate, best_individual.voting_weights)

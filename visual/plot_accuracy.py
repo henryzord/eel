@@ -34,11 +34,8 @@ def __plot__(data, df):
     return data
 
 
-def main():
+def make_plot(path_read):
     off.init_notebook_mode()
-    j = json.load(open('/home/henry/Projects/eel/params.json'))
-
-    path_read = j['reporter_output']
     output_name = os.path.join(path_read, 'accuracy.html')
 
     generate_df = pd.DataFrame([])
@@ -193,4 +190,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    _j = json.load(open('/home/henry/Projects/eel/params.json'))
+    _path_read = _j['reporter_output']
+    make_plot(_path_read)
