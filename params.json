@@ -1,5 +1,5 @@
 {
-  "reporter_output": "/home/henry/Projects/eel/metadata/column_3C_weka", 
+  "reporter_output": "/home/henry/Projects/eel/metadata",
   "metaparams": {
     "generation": {
       "selection_strength": 0.5, 
@@ -13,13 +13,13 @@
       "n_individuals": 10
     }, 
     "integration": {
-      "n_generations": 50, 
+      "n_generations": 50,
       "verbose": true, 
       "n_individuals": 100
     }
   }, 
   "random_state": 0, 
   "n_folds": 3, 
-  "n_runs": 10, 
-  "full_path": "/home/henry/Projects/eel/datasets/uci/column_3C_weka.arff"
+  "n_runs": 3,
+  "full_path": "/home/henry/Projects/eel/datasets/uci/semeion.arff"
 }

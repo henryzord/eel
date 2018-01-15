@@ -36,10 +36,10 @@ def __plot__(data, df):
 
 def main():
     off.init_notebook_mode()
-    j = json.load(open('../params.json'))
+    j = json.load(open('/home/henry/Projects/eel/params.json'))
 
-    output_name = 'accuracy.html'
     path_read = j['reporter_output']
+    output_name = os.path.join(path_read, 'accuracy.html')
 
     generate_df = pd.DataFrame([])
     select_df = pd.DataFrame([])

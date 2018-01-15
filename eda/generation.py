@@ -243,7 +243,7 @@ class EnsembleGenerator(object):
         # features = np.array(map(lambda x: x.tolist(), ensemble.features))
         # return np.array(ensemble.classifiers)[A_index], features[A_index], P_fitness[A_index]
 
-    def rf_generate(self, n_classifiers, n_generations, selection_strength, reporter):
+    def rf_generate(self, n_classifiers, n_generations, selection_strength, reporter=None):
         """
 
         :param n_classifiers:
@@ -259,8 +259,8 @@ class EnsembleGenerator(object):
         )
         return ensemble
 
-    def ada_generate(self, n_classifiers, n_generations, selection_strength, reporter):
-        rf = AdaBoostClassifier(n_estimators=n_classifiers)
+    def ada_generate(self, n_classifiers, n_generations, selection_strength, reporter=None):
+        rf = AdaBoostClassifier(n_estimators=n_classifiers, algorithm='SAMME')
         rf = rf.fit(
             np.vstack((self.X_train, self.X_val)), np.hstack((self.y_train, self.y_val))
         )
@@ -269,7 +269,7 @@ class EnsembleGenerator(object):
         )
         return ensemble
 
-    def __core_generate__(self, n_classifiers, estimators, reporter):
+    def __core_generate__(self, n_classifiers, estimators, reporter=None):
         t1 = dt.now()
 
         ensemble = Ensemble.create_base(

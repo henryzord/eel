@@ -14,6 +14,7 @@ from utils import path_to_dataframe
 from eda.generation import EnsembleGenerator
 from eda.selection import select
 from xgboost import XGBClassifier
+import os
 
 
 def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None):
@@ -82,7 +83,6 @@ def eelem(params, X_train, y_train, X_val, y_val, X_test, y_test, reporter=None)
     return y_test_pred
 
 
-# def main():
 params = json.load(open('params.json', 'r'))
 
 full_df = path_to_dataframe(params['full_path'])
@@ -110,6 +110,13 @@ n_all = X.shape[0]
 skf = StratifiedKFold(n_splits=params['n_folds'], shuffle=True, random_state=params['random_state'])
 
 date = dt.now()
+
+n_algorithms = 4
+
+columns = ['fold', 'run', 'algorithm', 'test acc', 'test_size']
+
+df = pd.DataFrame(data=np.empty((params['n_folds'] * params['n_runs'] * n_algorithms, len(columns)), dtype=np.float32), columns=columns)
+row_counter = 0
 
 for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
     _run_eelem = []
@@ -158,7 +165,6 @@ for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
 
         preds_eel = eelem(params['metaparams'], X_train, y_train, X_val, y_val, X_test, y_test, reporter=reporter)
         __acc_eelem = accuracy_score(y_test, preds_eel)
-
         _run_eelem += [__acc_eelem * (float(n_test) / n_all)]  # accuracy for that run
 
         print '------ run accuracies: -----'
@@ -167,6 +173,17 @@ for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
         print '\teelem run accuracy: %.4f' % _run_eelem[-1]
         print '\txgb run accuracy: %.4f' % _run_xgb[-1]
         print '------------------------------'
+
+        # ----- saves accuracies ----- #
+        df.iloc[row_counter] = [fold, run, 'adaboost', _run_adaboost[-1], len(y_test)]
+        row_counter += 1
+        df.iloc[row_counter] = [fold, run, 'randomforest', _run_randomforest[-1], len(y_test)]
+        row_counter += 1
+        df.iloc[row_counter] = [fold, run, 'eel', _run_eelem[-1], len(y_test)]
+        row_counter += 1
+        df.iloc[row_counter] = [fold, run, 'xgb', _run_xgb[-1], len(y_test)]
+        row_counter += 1
+        df.to_csv(os.path.join(params['reporter_output'], 'meta.csv'), index=False)
 
     # -------- accuracy for that fold -------- #
     acc_eelem += [np.mean(_run_eelem)]  # the accuracy for eelem in that fold is the mean for N runs
@@ -193,3 +210,5 @@ print 'adaboost accuracy: %.4f +- %.4f' % (sum(acc_adaboost), np.mean(std_adaboo
 print 'randomForest accuracy: %.4f +- %.4f' % (sum(acc_randomforest), np.mean(std_randomforest))
 print 'eelem accuracy: %.4f +- %.4f' % (sum(acc_eelem), np.mean(std_eelem))
 print 'xgb accuracy: %.4f +- %.4f' % (sum(acc_xgb), np.mean(std_xgb))
+
+execfile('/home/henry/Projects/eel/visual/plot_accuracy.py')
