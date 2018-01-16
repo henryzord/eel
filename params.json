@@ -1,10 +1,10 @@
 {
-  "n_base_classifiers": 50,
+  "n_base_classifiers": 13,
   "random_state": 0,
-  "n_folds": 3,
-  "n_runs": 2,
-  "n_generations": 2,
+  "n_folds": 2,
+  "n_runs": 3,
+  "n_generations": 5,
   "n_individuals": 7,
   "use_weights": false,
-  "alias": "single-use-weight"
+  "single_column": false
 }

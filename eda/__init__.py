@@ -10,7 +10,7 @@ from multiprocessing import Process, Manager, Lock
 import numpy as np
 import pandas as pd
 from pathlib2 import Path
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.tree import DecisionTreeClassifier
 
 from utils import flatten
@@ -317,65 +317,92 @@ class Ensemble(object):
 
 
 class Reporter(object):
-    def __init__(self, Xs, ys, set_names, fold, n_run, output_path, alias=None, n_jobs=4):
+    metrics = [
+        ('accuracy', accuracy_score),
+        ('precision-micro', lambda y_true, y_pred: precision_score(y_true, y_pred, average='micro')),
+        ('precision-macro', lambda y_true, y_pred: precision_score(y_true, y_pred, average='macro')),
+        ('precision-weighted', lambda y_true, y_pred: precision_score(y_true, y_pred, average='weighted')),
+        # ('precision-samples', lambda y_true, y_pred: precision_score(y_true, y_pred, average='samples')),
+        ('recall-micro', lambda y_true, y_pred: recall_score(y_true, y_pred, average='micro')),
+        ('recall-macro', lambda y_true, y_pred: recall_score(y_true, y_pred, average='macro')),
+        ('recall-weighted', lambda y_true, y_pred: recall_score(y_true, y_pred, average='weighted')),
+        # ('recall-samples', lambda y_true, y_pred: recall_score(y_true, y_pred, average='samples')),
+        ('f1-micro', lambda y_true, y_pred: f1_score(y_true, y_pred, average='micro')),
+        ('f1-macro', lambda y_true, y_pred: f1_score(y_true, y_pred, average='macro')),
+        ('f1-weighted', lambda y_true, y_pred: f1_score(y_true, y_pred, average='weighted')),
+        # ('f1-samples', lambda y_true, y_pred: f1_score(y_true, y_pred, average='samples')),
+    ]
+
+    def __init__(self, Xs, ys, n_classifiers, n_classes, set_names, dataset_name, n_fold, n_run, output_path, alias=None, n_jobs=4):
         self.Xs = Xs
         self.ys = ys
         self.set_sizes = map(len, self.ys)
         self.set_names = set_names
+        self.dataset_name = dataset_name
         if alias is None:
             self.alias = str(dt.now())
         else:
             if isinstance(alias, datetime.datetime):
                 alias = str(alias)
             self.alias = alias
-        self.run = n_run
+        self.n_run = n_run
+        self.n_fold = n_fold
+        self.n_classifiers = n_classifiers
+        self.n_classes = n_classes
         self.output_path = output_path
-        self._fold = fold
 
-    @property
-    def fold(self):
-        return self._fold
-
-    @fold.setter
-    def fold(self, value):
-        self._fold = value
-
-    def __get_hash__(self, func):
-        return hash(func.__name__ + str(self.fold))
-
-    def save_population(self, func, ensembles):
-        # accuracy_score, f1_measure, precision_score, recall_score
-
-        weights = []
-        for ensemble in ensembles:
-            ravel_weights = [ensemble.voting_weights.ravel()]
-
-
-
-            weights += data
-
-        dense = pd.DataFrame(weights, dtype=np.float32)
-
-        pd.DataFrame(dense).to_csv(
-            os.path.join(self.output_path, self.alias + '_' + 'population' + '_' + func.__name__ + '.csv'),
-            sep=',',
-            index=False,
-            header=False
+        self.population_file = os.path.join(
+            self.output_path, '-'.join([self.alias, self.dataset_name, str(self.n_fold), str(self.n_run), 'pop']) + '.csv'
         )
-
-    def save_gm(self, func, gen, gm):
-        output = os.path.join(self.output_path, self.alias + '_gm_' + func.__name__ + '.csv')
-        pth = Path(output)
-
-        if not pth.exists():
-            with open(output, 'w') as f:
-                writer = csv.writer(f, delimiter=',')
-                writer.writerow(['method', 'fold', 'run', 'generation'] + ['var' + str(x) for x in xrange(gm.size)])
-
-        with open(output, 'a') as f:
+        with open(self.population_file, 'wb') as f:
             writer = csv.writer(f, delimiter=',')
-            writer.writerow([func.__name__, self.fold, self.run, str(gen)] + list(gm.ravel()))
+            writer.writerow(
+                ['dataset', 'n_fold', 'n_run', 'generation', 'set_name', 'elite', 'fitness'] +
+                [a for a, b in Reporter.metrics] +
+                ['w_%d_%d' % (a, b) for a, b in it.product(np.arange(self.n_classifiers), np.arange(self.n_classes))]
+            )
 
+        self.gm_file = os.path.join(
+            self.output_path,
+            '-'.join([self.alias, self.dataset_name, str(self.n_fold), str(self.n_run), 'gm']) + '.csv'
+        )
+        with open(self.gm_file, 'wb') as f:
+            writer = csv.writer(f, delimiter=',')
+            writer.writerow(
+                ['dataset', 'n_fold', 'n_run', 'generation', 'scale'] +
+                ['w_%d_%d' % (a, b) for a, b in it.product(np.arange(self.n_classifiers), np.arange(self.n_classes))]
+            )
+
+    # def __get_hash__(self, func):
+    #     return hash(func.__name__ + str(self.n_fold))
+
+    def save_population(self, generation, elite, ensembles, P_fitness):
+
+        with open(self.population_file, 'ab') as f:
+            writer = csv.writer(f, delimiter=',')
+
+            counter = 0
+            for elite, ensemble, fitness in it.izip(elite, ensembles, P_fitness):
+                ravel_weights = ensemble.voting_weights.ravel().tolist()
+
+                for set_name, set_x, set_y in it.izip(self.set_names, self.Xs, self.ys):
+                    preds = ensemble.predict(set_x)
+                    results = []
+                    for metric_name, metric_func in Reporter.metrics:
+                        results += [metric_func(y_true=set_y, y_pred=preds)]
+
+                    writer.writerow(
+                        [self.dataset_name, self.n_fold, self.n_run, generation, set_name, elite, fitness] + results + ravel_weights
+                    )
+                    counter += 1
+
+    def save_gm(self, generation, loc, scale):
+        with open(self.gm_file, 'ab') as f:
+            writer = csv.writer(f, delimiter=',')
+            writer.writerow(
+                [self.dataset_name, self.n_fold, self.n_run, generation, scale] +
+                loc.ravel().tolist()
+            )
 
 # class DummyIterator(object):
 #     def __init__(self, value, length, reset=True):

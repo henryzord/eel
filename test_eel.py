@@ -32,8 +32,8 @@ def eelem(params, X_train, y_train, use_weights=False, reporter=None):
     ensemble_train_acc = accuracy_score(ensemble.y_train, ensemble.predict(ensemble.X_train))
     dfd = ensemble.dfd(ensemble.X_train, ensemble.y_train)
 
-    print 'generation 0: ens val acc: %.4f dfd: %.4f time elapsed: %f' % (
-        ensemble_train_acc, dfd, (dt.now() - t1).total_seconds()
+    print 'generation %02.d: ens val acc: %.4f dfd: %.4f time elapsed: %f' % (
+        -1, ensemble_train_acc, dfd, (dt.now() - t1).total_seconds()
     )
 
     ensemble = integrate(
@@ -73,14 +73,9 @@ def main():
 
         n_all = X.shape[0]
 
-        # variables = {}
-        # sys.stdout = open(
-        #     os.path.join(params_file['reporter_output'], dataset_name + '.txt'), 'w'
-        # )
-
         skf = StratifiedKFold(n_splits=params['n_folds'], shuffle=True, random_state=params['random_state'])
 
-        alias = params['alias']
+        alias = ('single' if params['single_column'] else 'multi') + '-' + ('ada' if params['use_weights'] else 'normal')
 
         for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
 
@@ -93,14 +88,19 @@ def main():
                 y_train = y.iloc[train_index]
                 y_test = y.iloc[test_index]
 
+                n_classes = len(np.unique(y_train))
+
                 reporter = Reporter(
                     Xs=[X_train, X_test],
                     ys=[y_train, y_test],
                     set_names=['train', 'test'],
                     output_path=output_path,
+                    dataset_name=dataset_name,
                     alias=alias,
-                    fold=fold,
-                    n_run=run
+                    n_fold=fold,
+                    n_run=run,
+                    n_classifiers=params['n_base_classifiers'],
+                    n_classes=n_classes
                 )
 
                 n_test = X_test.shape[0]
@@ -114,6 +114,8 @@ def main():
                 print '------ run accuracies: -----'
                 print '\teelem run accuracy: %.4f' % _run_eelem[-1]
                 print '------------------------------'
+
+                # raise NotImplementedError('not implemented yet!')
 
                 # -------- accuracy for that fold -------- #
             acc_eelem += [np.mean(_run_eelem)]  # the accuracy for eelem in that fold is the mean for N runs

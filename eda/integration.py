@@ -43,11 +43,11 @@ def __get_best_individual__(P, P_fitness):
     return P[np.argmin(P_fitness)]  # type: Ensemble
 
 
-def __save__(reporter, g, P, loc, scale):
+def __save__(reporter, generation, A, P, P_fitness, loc, scale):
     """
 
     :param reporter: eda.Reporter
-    :param g:
+    :param generation:
     :param P:
     :param loc:
     :param scale:
@@ -55,9 +55,8 @@ def __save__(reporter, g, P, loc, scale):
     """
 
     try:
-        reporter.save_metrics(integrate, g, P)
-        reporter.save_population(integrate, g, P)
-        reporter.save_gm(integrate, g, loc, scale)
+        reporter.save_population(generation=generation, elite=A, ensembles=P, P_fitness=P_fitness)
+        reporter.save_gm(generation, loc, scale)
     except AttributeError:
         pass
 
@@ -90,15 +89,22 @@ def integrate(ensemble, n_individuals=100, n_generations=100, reporter=None):
     streak = 0
     max_streak = 5
 
-    __save__(reporter, 0, [ensemble], loc, scale)
+    __save__(
+        reporter=reporter, generation=-1, A=[0], P=[ensemble], P_fitness=[0], loc=loc, scale=scale
+    )
 
-    g = 1
+    g = 0
     while g < n_generations:
         for i in xrange(n_individuals):
             if not A[i]:
                 for j in xrange(P[i].n_classifiers):
                     for c in xrange(n_classes):
-                        P[i].voting_weights[j] = np.clip(np.random.normal(loc=loc[j], scale=scale), a_min=0., a_max=1.)
+                        P[i].voting_weights[j][c] = np.clip(
+                            np.random.normal(
+                                loc=loc[j][c], scale=scale
+                            ),
+                            a_min=0., a_max=1.
+                        )
 
                 train_probs = P[i].predict_prob(P[i].X_train)
                 argtrain = np.argmax(train_probs, axis=1)
@@ -110,7 +116,9 @@ def integrate(ensemble, n_individuals=100, n_generations=100, reporter=None):
         A = __get_elite__(P_fitness, A=A)
         best_individual = __get_best_individual__(P, P_fitness)  # type: Ensemble
 
-        __save__(reporter, g, P, loc, scale)
+        __save__(
+            reporter=reporter, generation=g, A=A, P=P, P_fitness=P_fitness, loc=loc, scale=scale
+        )
 
         ensemble_train_acc = accuracy_score(ensemble.y_train, best_individual.predict(ensemble.X_train))
         dfd = best_individual.dfd(ensemble.X_train, ensemble.y_train)
@@ -131,7 +139,7 @@ def integrate(ensemble, n_individuals=100, n_generations=100, reporter=None):
 
         t2 = dt.now()
 
-        print 'generation %2.d: ens val acc: %.4f dfd: %.4f median: %.4f time elapsed: %f' % (
+        print 'generation %02.d: ens val acc: %.4f dfd: %.4f median: %.4f time elapsed: %f' % (
             g, ensemble_train_acc, dfd, median, (dt.now() - t1).total_seconds()
         )
 
@@ -140,6 +148,8 @@ def integrate(ensemble, n_individuals=100, n_generations=100, reporter=None):
 
     best_individual = __get_best_individual__(P, P_fitness)  # type: Ensemble
 
-    __save__(reporter, g, P, loc, scale)
+    __save__(
+        reporter=reporter, generation=g, A=A, P=P, P_fitness=P_fitness, loc=loc, scale=scale
+    )
 
     return best_individual
