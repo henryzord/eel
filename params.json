@@ -1,25 +1,10 @@
 {
-  "reporter_output": "metadata/column_2C_weka", 
-  "metaparams": {
-    "generation": {
-      "selection_strength": 0.5, 
-      "n_generations": 1, 
-      "verbose": true, 
-      "n_individuals": 50
-    }, 
-    "selection": {
-      "n_generations": 0, 
-      "verbose": true, 
-      "n_individuals": 10
-    }, 
-    "integration": {
-      "n_generations": 50, 
-      "verbose": true, 
-      "n_individuals": 100
-    }
-  }, 
-  "random_state": 0, 
-  "n_folds": 3, 
-  "n_runs": 10, 
-  "full_path": "datasets/uci/column_2C_weka.arff"
+  "n_base_classifiers": 50,
+  "random_state": 0,
+  "n_folds": 3,
+  "n_runs": 2,
+  "n_generations": 2,
+  "n_individuals": 7,
+  "use_weights": false,
+  "alias": "single-use-weight"
 }

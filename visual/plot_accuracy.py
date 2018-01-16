@@ -186,7 +186,7 @@ def make_plot(path_read):
         data=traces,
         layout=layout
     )
-    off.plot(fig, filename=output_name)
+    off.plot(fig, filename=output_name, auto_open=False)
 
 
 if __name__ == '__main__':
