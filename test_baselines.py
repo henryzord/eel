@@ -37,7 +37,7 @@ def test_baselines(datasets_path, output_path, params_path):
 
     params = json.load(open(params_path, 'r'))
     datasets = [str(xx).split('/')[-1] for xx in pathlib2.Path(datasets_path).iterdir() if xx.is_file()]
-    algorithms = [LogisticAdaBoost, AdaBoostClassifier, AdaBoostOnes]
+    algorithms = [LogisticAdaBoost, AdaBoostClassifier, AdaBoostOnes, AdaBoostNormal]
 
     for dataset in datasets:
         dataset_name = dataset.split('/')[-1].split('.')[-2]
