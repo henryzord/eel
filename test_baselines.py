@@ -13,7 +13,7 @@ import pathlib2
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.model_selection import StratifiedKFold
 
-from linear import LogisticAdaBoost, AdaBoostOnes
+from linear import LogisticAdaBoost, AdaBoostOnes, AdaBoostNormal
 from utils import path_to_dataframe
 from reporter import BaselineReporter
 
