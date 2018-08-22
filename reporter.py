@@ -336,9 +336,9 @@ class EDAReporter(BaseReporter):
             partial = summary.loc[summary['dataset_name'] == dataset_name]
             if len(partial.index) != (n_folds * n_runs):
                 global_counter += (n_folds * n_runs)
-                print '%04.d/%04.d steps done [skipping %s]' % (
+                print ('%04.d/%04.d steps done [skipping %s]' % (
                     global_counter, total_steps, dataset_name
-                )
+                ))
                 continue  # skips
 
             __local_metrics = {k: dict() for k in metric_names}  # one dictionary for each dataset
@@ -381,7 +381,7 @@ class EDAReporter(BaseReporter):
                                                                       dataset_size))
 
                     global_counter += 1
-                    print '%04.d/%04.d steps done' % (global_counter, total_steps)
+                    print ('%04.d/%04.d steps done' % (global_counter, total_steps))
 
             metric_means = {k: np.mean(v.values()) for k, v in __local_metrics.items()}
             metric_stds = {k: np.std(v.values()) for k, v in __local_metrics.items()}

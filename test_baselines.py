@@ -42,7 +42,7 @@ def test_baselines(datasets_path, output_path, params_path):
     for dataset in datasets:
         dataset_name = dataset.split('/')[-1].split('.')[-2]
 
-        print 'testing %s dataset' % dataset_name
+        print ('testing %s dataset' % dataset_name)
 
         full_df = path_to_dataframe(os.path.join(datasets_path, dataset))
 
@@ -68,9 +68,9 @@ def test_baselines(datasets_path, output_path, params_path):
 
             for n_run in xrange(n_runs):
                 for algorithm in algorithms:
-                    print '# --- dataset: %r n_fold: %r n_run: %r algorithm: %r --- #' % (
+                    print ('# --- dataset: %r n_fold: %r n_run: %r algorithm: %r --- #' % (
                         dataset_name, n_fold, n_run, algorithm.__name__
-                    )
+                    ))
 
                     reporter = BaselineReporter(
                         Xs=[X_train, X_test],
@@ -97,11 +97,11 @@ def test_baselines(datasets_path, output_path, params_path):
 
 if __name__ == '__main__':
     if len(sys.argv) != 5:
-        print 'usage:'
-        print '\tpython test_baselines.py <path_datasets> <path_metadata> <path_params> <path_results>'
-        print 'example:'
-        print '\tpython test_baselines.py \"/home/user/datasets\" \"/home/user/metadata\"' + \
-              '\"/home/user/params.json\" \"/home/user/results.csv\"'
+        print ('usage:')
+        print ('\tpython test_baselines.py <path_datasets> <path_metadata> <path_params> <path_results>')
+        print ('example:')
+        print ('\tpython test_baselines.py \"/home/user/datasets\" \"/home/user/metadata\"' + \
+              '\"/home/user/params.json\" \"/home/user/results.csv\"')
     else:
         __dataset_path, __output_path, __params_path, __results_path = sys.argv[1:]
         test_baselines(__dataset_path, __output_path, __params_path)
