@@ -128,7 +128,7 @@ class BaselineReporter(BaseReporter):
             writer = csv.writer(f, delimiter=',')
 
             counter = 0
-            for set_name, set_size, set_x, set_y in it.izip(self.set_names, self.set_sizes, self.Xs, self.ys):
+            for set_name, set_size, set_x, set_y in zip(self.set_names, self.set_sizes, self.Xs, self.ys):
                 preds = ensemble.predict(set_x)
                 results = []
                 for metric_name, metric_func in BaseReporter.metrics:
