@@ -75,7 +75,7 @@ class LogisticAdaBoost(AdaBoostClassifier):
 
         preds = np.empty((self.n_estimators, X.shape[0]), dtype=np.int32)
 
-        for i in xrange(self.n_estimators):  # number of base classifiers
+        for i in range(self.n_estimators):  # number of base classifiers
             preds[i, :] = self.estimators_[i].predict(X)
 
         return preds

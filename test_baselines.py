@@ -66,7 +66,7 @@ def test_baselines(datasets_path, output_path, params_path):
 
             n_classes = len(np.unique(y_train))
 
-            for n_run in xrange(n_runs):
+            for n_run in range(n_runs):
                 for algorithm in algorithms:
                     print ('# --- dataset: %r n_fold: %r n_run: %r algorithm: %r --- #' % (
                         dataset_name, n_fold, n_run, algorithm.__name__
