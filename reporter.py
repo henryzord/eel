@@ -124,7 +124,7 @@ class BaselineReporter(BaseReporter):
 
     def save_baseline(self, ensemble):
 
-        with open(self.population_file, 'ab') as f:
+        with open(self.population_file, 'a') as f:
             writer = csv.writer(f, delimiter=',')
 
             counter = 0
@@ -142,7 +142,7 @@ class BaselineReporter(BaseReporter):
     @staticmethod
     def generate_summary(path_read, path_out):
         files = [xx for xx in pathlib2.Path(path_read).iterdir() if xx.is_file()]
-        files = map(lambda x: str(x).split('/')[-1].split('.')[0].split('-'), files)
+        files = list(map(lambda x: str(x).split('/')[-1].split('.')[0].split('-'), files))
         summary = pd.DataFrame(files, columns=['dataset_name', 'n_fold', 'n_run', 'algorithm'])
         summary['n_fold'] = summary['n_fold'].astype(np.int32)
         summary['n_run'] = summary['n_run'].astype(np.int32)
@@ -166,8 +166,8 @@ class BaselineReporter(BaseReporter):
                 dataset_size = None
 
                 __local_metrics = {k: dict() for k in metric_names}
-                for n_fold in xrange(n_folds):
-                    for n_run in xrange(n_runs):
+                for n_fold in range(n_folds):
+                    for n_run in range(n_runs):
                         current = pd.read_csv(
                             os.path.join(
                                 path_read,
@@ -192,11 +192,11 @@ class BaselineReporter(BaseReporter):
                                 __local_metrics[metric_name][n_run] = float(current[metric_name]) * \
                                                                       (float(current['set_size']) / float(dataset_size))
 
-                metric_means = {k: np.mean(v.values()) for k, v in __local_metrics.items()}
-                metric_stds = {k: np.std(v.values()) for k, v in __local_metrics.items()}
+                metric_means = {k: np.mean(list(v.values())) for k, v in __local_metrics.items()}
+                metric_stds = {k: np.std(list(v.values())) for k, v in __local_metrics.items()}
 
                 for (metric_name, metric_mean), (metric_name, metric_std) in \
-                        it.izip(metric_means.items(), metric_stds.items()):
+                        zip(metric_means.items(), metric_stds.items()):
                     result_df.loc[(algorithm, dataset)][metric_name + ' mean'] = metric_mean
                     result_df.loc[(algorithm, dataset)][metric_name + ' std'] = metric_std
 
