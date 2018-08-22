@@ -115,7 +115,7 @@ class BaselineReporter(BaseReporter):
             reason=algorithm.__name__
         )
 
-        with open(self.population_file, 'wb') as f:
+        with open(self.population_file, 'w') as f:
             writer = csv.writer(f, delimiter=',')
             writer.writerow(
                 ['dataset', 'n_fold', 'n_run', 'set_name', 'set_size'] +
