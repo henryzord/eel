@@ -119,11 +119,11 @@ def preliminaries(dataset_path, output_path, params_path, n_fold, n_run):
 
 if __name__ == '__main__':
     if len(sys.argv) != 6:
-        print 'usage:'
-        print '\tpython main.py <path_datasets> <path_metadata> <path_params> <n_fold> <n_run>'
-        print 'example:'
-        print '\tpython main.py \"/home/user/datasets\" \"/home/user/metadata\"' + \
-              '\"/home/user/params.json\" 0 0'
+        print ('usage:')
+        print ('\tpython main.py <path_datasets> <path_metadata> <path_params> <n_fold> <n_run>')
+        print ('example:')
+        print ('\tpython main.py \"/home/user/datasets\" \"/home/user/metadata\"' + \
+              '\"/home/user/params.json\" 0 0')
 
     else:
         __dataset_path, __output_path, __params_path, __n_fold, __n_run = sys.argv[1:]

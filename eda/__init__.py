@@ -39,7 +39,7 @@ class Ensemble(object):
 
             self.base_classifier = base_classifier
             self.classifiers = []
-            for i in xrange(n_classifiers):
+            for i in range(n_classifiers):
                 self.classifiers += [DummyClassifier()]
         elif classifiers is not None:
             self.base_classifier = type(classifiers[0])
@@ -126,8 +126,8 @@ class Ensemble(object):
         :return: returns self.
         """
 
-        for j in xrange(self.n_classifiers):
-            for c in xrange(self.n_classes):
+        for j in range(self.n_classifiers):
+            for c in range(self.n_classes):
                 self.voting_weights[j][c] = np.clip(
                     np.random.normal(loc=loc[j][c], scale=scale),
                     a_min=0., a_max=1.
@@ -175,8 +175,8 @@ class Ensemble(object):
 
         global_votes = np.zeros((n_instances, self.n_classes), dtype=np.float32)
 
-        for i in xrange(n_instances):
-            for j in xrange(n_classifiers):
+        for i in range(n_instances):
+            for j in range(n_classifiers):
                 global_votes[i, preds[j, i]] += self.voting_weights[j, preds[j, i]]
 
         _sum = np.sum(global_votes, axis=1)
@@ -197,10 +197,10 @@ class Ensemble(object):
         local_votes = np.empty(self.n_classes, dtype=np.float32)
         global_votes = np.empty(n_instances, dtype=np.int32)
 
-        for i in xrange(n_instances):
+        for i in range(n_instances):
             local_votes[:] = 0.
 
-            for j in xrange(n_classifiers):
+            for j in range(n_classifiers):
                 local_votes[preds[j, i]] += self.voting_weights[j, preds[j, i]]
 
             global_votes[i] = np.argmax(local_votes)
@@ -250,7 +250,7 @@ class Ensemble(object):
         n_classifiers, n_instances = predictions.shape
         distinct_failures = np.zeros(n_classifiers + 1, dtype=np.float32)
 
-        for i in xrange(n_instances):
+        for i in range(n_instances):
             truth = y_true[i]
             count = Counter(predictions[:, i])
             for cls, n_votes in count.items():
@@ -262,7 +262,7 @@ class Ensemble(object):
         dfd = 0.
 
         if (distinct_failures_count > 0) and (n_classifiers > 1):
-            for j in xrange(1, n_classifiers + 1):
+            for j in range(1, n_classifiers + 1):
                 dfd += (float(n_classifiers - j) / float(n_classifiers - 1)) * \
                        (float(distinct_failures[j]) / distinct_failures_count)
 

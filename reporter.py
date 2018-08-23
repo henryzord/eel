@@ -244,19 +244,20 @@ class EDAReporter(BaseReporter):
             n_fold=self.n_fold, n_run=self.n_run, reason='gm'
         )
 
-        with open(self.population_file, 'wb') as f:
+        with open(self.population_file, 'w') as f:
             writer = csv.writer(f, delimiter=',')
             writer.writerow(
                 ['dataset', 'n_fold', 'n_run', 'generation', 'set_name', 'set_size', 'elite', 'fitness'] +
                 [a for a, b in EDAReporter.metrics] +
-                ['w_%d_%d' % (a, b) for a, b in it.product(np.arange(self.n_classifiers), np.arange(self.n_classes))]
+                ['w_%d_%d' % (a, b) for a, b in list(it.product(np.arange(self.n_classifiers), np.arange(self.n_classes)))]
             )
 
-        with open(self.gm_file, 'wb') as f:
+
+        with open(self.gm_file, 'w') as f:
             writer = csv.writer(f, delimiter=',')
             writer.writerow(
                 ['dataset', 'n_fold', 'n_run', 'generation', 'scale'] +
-                ['w_%d_%d' % (a, b) for a, b in it.product(np.arange(self.n_classifiers), np.arange(self.n_classes))]
+                ['w_%d_%d' % (a, b) for a, b in list(it.product(np.arange(self.n_classifiers), np.arange(self.n_classes)))]
             )
 
     def save_population(self, generation, elite, ensembles, P_fitness):
@@ -270,14 +271,14 @@ class EDAReporter(BaseReporter):
         :param P_fitness: A list of arrays denoting the fitness of that individuals.
         """
 
-        with open(self.population_file, 'ab') as f:
+        with open(self.population_file, 'a') as f:
             writer = csv.writer(f, delimiter=',')
 
             counter = 0
-            for elite, ensemble, fitness in it.izip(elite, ensembles, P_fitness):
+            for elite, ensemble, fitness in list(zip(elite, ensembles, P_fitness)):
                 ravel_weights = ensemble.voting_weights.ravel().tolist()
 
-                for set_name, set_size, set_x, set_y in it.izip(self.set_names, self.set_sizes, self.Xs, self.ys):
+                for set_name, set_size, set_x, set_y in list(zip(self.set_names, self.set_sizes, self.Xs, self.ys)):
                     preds = ensemble.predict(set_x)
                     results = []
                     for metric_name, metric_func in EDAReporter.metrics:
@@ -298,7 +299,7 @@ class EDAReporter(BaseReporter):
         :param scale: A matrix with the std deviation of each variable PMF.
         """
 
-        with open(self.gm_file, 'ab') as f:
+        with open(self.gm_file, 'a') as f:
             writer = csv.writer(f, delimiter=',')
             writer.writerow(
                 [self.dataset_name, self.n_fold, self.n_run, generation, scale] +
@@ -308,7 +309,7 @@ class EDAReporter(BaseReporter):
     @staticmethod
     def generate_summary(path_read, path_out):
         files = [xx for xx in pathlib2.Path(path_read).iterdir() if (xx.is_file() and 'pop.csv' in str(xx))]
-        files = map(lambda x: str(x).split('/')[-1].split('.')[0].split('-'), files)
+        files = list(map(lambda x: str(x).split('/')[-1].split('.')[0].split('-'), files))
         summary = pd.DataFrame(files, columns=['dataset_name', 'n_fold', 'n_run', 'pop'])
         summary['n_fold'] = summary['n_fold'].astype(np.int32)
         summary['n_run'] = summary['n_run'].astype(np.int32)
@@ -342,8 +343,8 @@ class EDAReporter(BaseReporter):
                 continue  # skips
 
             __local_metrics = {k: dict() for k in metric_names}  # one dictionary for each dataset
-            for n_fold in xrange(n_folds):
-                for n_run in xrange(n_runs):
+            for n_fold in range(n_folds):
+                for n_run in range(n_runs):
                     file_name = '-'.join([dataset_name, str(n_fold), str(n_run), 'pop']) + '.csv'
 
                     current = pd.read_csv(
@@ -383,11 +384,11 @@ class EDAReporter(BaseReporter):
                     global_counter += 1
                     print ('%04.d/%04.d steps done' % (global_counter, total_steps))
 
-            metric_means = {k: np.mean(v.values()) for k, v in __local_metrics.items()}
-            metric_stds = {k: np.std(v.values()) for k, v in __local_metrics.items()}
+            metric_means = {k: np.mean(list(v.values())) for k, v in __local_metrics.items()}
+            metric_stds = {k: np.std(list(v.values())) for k, v in __local_metrics.items()}
 
             for (metric_name, metric_mean), (metric_name, metric_std) in \
-                    it.izip(metric_means.items(), metric_stds.items()):
+                    list(zip(metric_means.items(), metric_stds.items())):
                 result_df.loc[dataset_name][metric_name + ' mean'] = metric_mean
                 result_df.loc[dataset_name][metric_name + ' std'] = metric_std
 
