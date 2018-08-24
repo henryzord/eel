@@ -60,13 +60,13 @@ def test_eel(datasets_path, output_path, params_path, n_runs, n_jobs):
     for dataset in datasets:
         dataset_name = dataset.split('/')[-1].split('.')[-2]
 
-        print 'testing %s dataset' % dataset_name
+        print ('testing %s dataset' % dataset_name)
 
-        for n_fold in xrange(params['n_folds']):
-            for n_run in xrange(n_runs):
-                print '# --- dataset: %r n_fold: %r/%r n_run: %r/%r --- #' % (
+        for n_fold in range(params['n_folds']):
+            for n_run in range(n_runs):
+                print ('# --- dataset: %r n_fold: %r/%r n_run: %r/%r --- #' % (
                     dataset_name, n_fold + 1, params['n_folds'], n_run + 1, n_runs
-                )
+                ))
 
                 while len(jobs) >= n_jobs:
                     jobs = __get_running_processes__(jobs)
@@ -92,11 +92,11 @@ def test_eel(datasets_path, output_path, params_path, n_runs, n_jobs):
 
 if __name__ == '__main__':
     if len(sys.argv) != 7:
-        print 'usage:'
-        print '\tpython test_eel.py <path_datasets> <path_metadata> <path_params> <path_results> <n_runs> <n_jobs>'
-        print 'example:'
-        print '\tpython test_eel.py \"/home/user/datasets\" \"/home/user/metadata\"' + \
-              '\"/home/user/params.json\" \"/home/user/results.csv\" 10 4'
+        print ('usage:')
+        print ('\tpython test_eel.py <path_datasets> <path_metadata> <path_params> <path_results> <n_runs> <n_jobs>')
+        print ('example:')
+        print ('\tpython test_eel.py \"/home/user/datasets\" \"/home/user/metadata\"' + \
+              '\"/home/user/params.json\" \"/home/user/results.csv\" 10 4')
 
     else:
         __datasets_path, __output_path, __params_path, __results_path, __n_runs, __n_jobs = sys.argv[1:]

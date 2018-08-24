@@ -45,7 +45,7 @@ def __update__(P, A, loc):
 
     n_elite = np.count_nonzero(A)
 
-    for i in xrange(len(A)):
+    for i in range(len(A)):
         if A[i]:
             loc += P[i].voting_weights
 
@@ -119,7 +119,7 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
         loc = np.random.normal(loc=1., scale=scale, size=(n_classifiers, n_classes)).astype(dtype=np.float32)
 
     P = []
-    for i in xrange(n_individuals):
+    for i in range(n_individuals):
         P += [copy.deepcopy(ensemble)]
     P_fitness = np.empty(n_individuals, dtype=np.float32)
     A = np.zeros(n_individuals, dtype=np.int32)
@@ -133,9 +133,9 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
     ensemble_train_acc = accuracy_score(ensemble.y_train, ensemble.predict(ensemble.X_train))
     dfd = ensemble.dfd(ensemble.X_train, ensemble.y_train)
 
-    print 'generation %02.d: ens val acc: %.4f dfd: %.4f time elapsed: %f' % (
+    print ('generation %02.d: ens val acc: %.4f dfd: %.4f time elapsed: %f' % (
         -1, ensemble_train_acc, dfd, (dt.now() - t1).total_seconds()
-    )
+    ))
 
     __save__(
         reporter=reporter, generation=-1, A=[0], P=[ensemble], P_fitness=[0], loc=loc, scale=scale
@@ -143,7 +143,7 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
 
     g = 0
     while g < n_generations:
-        for i in xrange(n_individuals):
+        for i in range(n_individuals):
             if not A[i]:
                 P[i] = P[i].resample_voting_weights(loc=loc, scale=scale)
 
@@ -181,9 +181,9 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
         t2 = dt.now()
 
         if verbose:
-            print 'generation %02.d: ens val acc: %.4f dfd: %.4f median: %.4f time elapsed: %f' % (
+            print ('generation %02.d: ens val acc: %.4f dfd: %.4f median: %.4f time elapsed: %f' % (
                 g, ensemble_train_acc, dfd, median, (dt.now() - t1).total_seconds()
-            )
+            ))
 
         t1 = t2
         g += 1
