@@ -5,7 +5,6 @@ It should output a folder full of metadata, as well as the summary of results fo
 import argparse
 import json
 import os
-import sys
 import time
 from multiprocessing import Process
 from subprocess import Popen
@@ -60,30 +59,38 @@ def test_eel(datasets_path, output_path, params_path, n_runs, n_jobs):
     for dataset in datasets:
         dataset_name = dataset.split('/')[-1].split('.')[-2]
 
-        print ('testing %s dataset' % dataset_name)
+        print('testing %s dataset' % dataset_name)
 
         for n_fold in range(params['n_folds']):
             for n_run in range(n_runs):
-                print ('# --- dataset: %r n_fold: %r/%r n_run: %r/%r --- #' % (
+                print('# --- dataset: %r n_fold: %r/%r n_run: %r/%r --- #' % (
                     dataset_name, n_fold + 1, params['n_folds'], n_run + 1, n_runs
                 ))
 
-                while len(jobs) >= n_jobs:
-                    jobs = __get_running_processes__(jobs)
-                    time.sleep(5)
-
-                job = Process(
-                    target=preliminaries,
-                    kwargs=dict(
-                        dataset_path=os.path.join(datasets_path, dataset),
-                        output_path=output_path,
-                        params_path=params_path,
-                        n_fold=n_fold,
-                        n_run=n_run,
-                    )
+                preliminaries(
+                    dataset_path=os.path.join(datasets_path, dataset),
+                    output_path=output_path,
+                    params_path=params_path,
+                    n_fold=n_fold,
+                    n_run=n_run,
                 )
-                job.start()
-                jobs += [job]
+
+                # while len(jobs) >= n_jobs:
+                #     jobs = __get_running_processes__(jobs)
+                #     time.sleep(5)
+
+                # job = Process(
+                #     target=preliminaries,
+                #     kwargs=dict(
+                #         dataset_path=os.path.join(datasets_path, dataset),
+                #         output_path=output_path,
+                #         params_path=params_path,
+                #         n_fold=n_fold,
+                #         n_run=n_run,
+                #     )
+                # )
+                # job.start()
+                # jobs += [job]
 
     while len(jobs) > 0:
         jobs = __get_running_processes__(jobs)

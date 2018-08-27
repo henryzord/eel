@@ -252,7 +252,6 @@ class EDAReporter(BaseReporter):
                 ['w_%d_%d' % (a, b) for a, b in list(it.product(np.arange(self.n_classifiers), np.arange(self.n_classes)))]
             )
 
-
         with open(self.gm_file, 'w') as f:
             writer = csv.writer(f, delimiter=',')
             writer.writerow(
@@ -368,7 +367,7 @@ class EDAReporter(BaseReporter):
                     # gets best individual from last generation
                     current = current.loc[
                         (current['generation'] == current['generation'].max()) & (current['set_name'] == 'test')
-                        ]
+                    ]
                     current = current.loc[current['fitness'] == current['fitness'].min()].iloc[0]
 
                     for metric_name in metric_names:

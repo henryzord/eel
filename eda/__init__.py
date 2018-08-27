@@ -3,15 +3,16 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import AdaBoostClassifier
+from data_normalization import DataNormalizer
 
 
 class Ensemble(object):
     def __init__(
             self,
-            X_train, y_train,
+            X_train, y_train, data_normalizer_class,
             n_classifiers=None, classifiers=None, base_classifier=None,
             n_features=None, features=None,
-            activated=None, voting_weights=None
+            activated=None, voting_weights=None,
     ):
         """
         Builds an ensemble of classifiers.
@@ -21,6 +22,10 @@ class Ensemble(object):
         :param y_train: Labels of training instances.
         :param classifiers: A list of classifiers that are in compliance
             with the (fit, predict) interface of sklearn classifiers.
+        :param data_normalizer_class: The class (i.e. NOT instantiated object) for a data normalization strategy.
+            Must be a class that supports the interface of normalizers in sklearn.preprocessing
+            (e.g. fit, transform, etc).
+        :type data_normalizer_class: type
         :param features: An matrix where each row is a classifier and each
             column denotes the absence or presence of that attribute for the given classifier.
         :param activated: A boolean array denoting the activated classifiers.
@@ -63,7 +68,21 @@ class Ensemble(object):
         # finally:
         self.n_features = len(self.truth_features[0])
 
-        self.X_train = X_train
+        if isinstance(data_normalizer_class, type):
+            self.normalizer = data_normalizer_class().fit(X_train.values)
+            self.X_train = pd.DataFrame(
+                data=self.normalizer.transform(X_train.values), index=X_train.index, columns=X_train.columns
+            )
+        elif isinstance(data_normalizer_class, DataNormalizer):
+            self.normalizer = data_normalizer_class
+            self.X_train = X_train
+            if not np.all(self.X_train.max(axis=0)):
+                raise ValueError('data_normalizer_class is instantiated, but X_train is not normalized!')
+        else:
+            raise TypeError(
+                'data_normalizer_class is neither a class nor an instance of data_normalization.DataNormalizer!'
+            )
+
         self.y_train = y_train
         self.feature_names = self.X_train.columns
 
@@ -84,16 +103,23 @@ class Ensemble(object):
         self.train_preds = np.empty((self.n_classifiers, n_instances_train), dtype=np.int32)
 
     @classmethod
-    def from_adaboost(cls, X_train, y_train, n_classifiers):
+    def from_adaboost(cls, X_train, y_train, data_normalizer_class, n_classifiers):
         """
         Initializes the ensemble using AdaBoost as generator of the base classifiers, as well as the voting weights.
 
         :type X_train: pandas.DataFrame
         :param X_train: Predictive attributes of the training instances.
         :param y_train: Labels of training instances.
+        :param data_normalizer_class: The class (i.e. NOT instantiated object) for a data normalization strategy.
+            Must be a class that supports the interface of normalizers in sklearn.preprocessing
+            (e.g. fit, transform, etc).
+        :type data_normalizer_class: type
         :param n_classifiers: Number of base classifiers to use within AdaBoost.
         :return: an ensemble of base classifiers trained by AdaBoost.
         """
+
+        normalizer = data_normalizer_class().fit(X_train.values)
+        X_train = pd.DataFrame(data=normalizer.transform(X_train.values), index=X_train.index, columns=X_train.columns)
 
         rf = AdaBoostClassifier(n_estimators=n_classifiers, algorithm='SAMME')  # type: AdaBoostClassifier
         rf = rf.fit(X_train, y_train)  # type: AdaBoostClassifier
@@ -105,6 +131,7 @@ class Ensemble(object):
 
         ensemble = Ensemble(
             X_train=X_train, y_train=y_train,
+            data_normalizer_class=normalizer,
             classifiers=rf.estimators_,
             features=np.ones(
                 (n_classifiers, X_train.shape[1]), dtype=np.int32
@@ -118,7 +145,7 @@ class Ensemble(object):
         """
         Samples voting weights for the whole ensemble from a normal distribution.
 
-        :type loc: float
+        :type loc: numpy.ndarray
         :param loc: the mean of the normal distribution.
         :type scale: float
         :param scale: the std deviation of the normal distribution.
@@ -152,6 +179,11 @@ class Ensemble(object):
         if X is self.X_train:
             preds = self.train_preds
         else:
+            if isinstance(X, pd.DataFrame):
+                X = pd.DataFrame(data=self.normalizer.transform(X), index=X.index, columns=X.columns)
+            elif isinstance(X, np.ndarray):
+                X = self.normalizer.transform(X)
+
             preds = np.empty((n_activated, X.shape[0]), dtype=np.int32)
 
         for raw, j in enumerate(index_activated):  # number of base classifiers
