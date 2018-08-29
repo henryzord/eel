@@ -20,15 +20,3 @@ class DataNormalizer(MinMaxScaler):
 
     def fit_transform(self, X, y=None, **fit_params):
         return super().fit_transform(X, y, **fit_params)
-
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #
-    # def fit(self, X, y=None):
-    #     super().fit(X, y)
-    #
-    # def fit_transform(self, X, y=None, **fit_params):
-    #     super().fit_transform(X, y, **fit_params)
-    #
-    # def transform(self, X):
-    #     super().transform(X)

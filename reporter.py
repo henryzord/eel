@@ -152,7 +152,7 @@ class BaselineReporter(BaseReporter):
         n_folds = len(summary['n_fold'].unique())
         n_runs = len(summary['n_run'].unique())
 
-        metric_names = [metric_name for metric_name, metric in EDAReporter.metrics]
+        metric_names = [metric_name for metric_name, metric in BaseReporter.metrics]
 
         result_df = pd.DataFrame(
             index=pd.MultiIndex.from_tuples(list(it.product(algorithms, datasets))),
@@ -336,7 +336,7 @@ class EDAReporter(BaseReporter):
             partial = summary.loc[summary['dataset_name'] == dataset_name]
             if len(partial.index) != (n_folds * n_runs):
                 global_counter += (n_folds * n_runs)
-                print ('%04.d/%04.d steps done [skipping %s]' % (
+                print('%04.d/%04.d steps done [skipping %s]' % (
                     global_counter, total_steps, dataset_name
                 ))
                 continue  # skips
@@ -381,7 +381,7 @@ class EDAReporter(BaseReporter):
                                                                       dataset_size))
 
                     global_counter += 1
-                    print ('%04.d/%04.d steps done' % (global_counter, total_steps))
+                    print('%04.d/%04.d steps done' % (global_counter, total_steps))
 
             metric_means = {k: np.mean(list(v.values())) for k, v in __local_metrics.items()}
             metric_stds = {k: np.std(list(v.values())) for k, v in __local_metrics.items()}
@@ -392,9 +392,3 @@ class EDAReporter(BaseReporter):
                 result_df.loc[dataset_name][metric_name + ' std'] = metric_std
 
         result_df.to_csv(path_out, index=True, sep=',', float_format='%0.8f')
-
-
-if __name__ == '__main__':
-    __path_read, __path_out = sys.argv[1:]
-
-    EDAReporter.generate_summary(__path_read, __path_out)

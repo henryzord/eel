@@ -133,7 +133,7 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
     ensemble_train_acc = accuracy_score(ensemble.y_train, ensemble.predict(ensemble.X_train))
     dfd = ensemble.dfd(ensemble.X_train, ensemble.y_train)
 
-    print ('generation %02.d: ens val acc: %.4f dfd: %.4f time elapsed: %f' % (
+    print('generation %02.d: ens val acc: %.4f dfd: %.4f time elapsed: %f' % (
         -1, ensemble_train_acc, dfd, (dt.now() - t1).total_seconds()
     ))
 
@@ -181,8 +181,8 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
         t2 = dt.now()
 
         if verbose:
-            print ('generation %02.d: ens val acc: %.4f dfd: %.4f median: %.4f time elapsed: %f' % (
-                g, ensemble_train_acc, dfd, median, (dt.now() - t1).total_seconds()
+            print('generation %02.d: ens val acc: %.4f dfd: %.4f median: %.4f time elapsed: %f' % (
+                g, ensemble_train_acc, dfd, median, (t2 - t1).total_seconds()
             ))
 
         t1 = t2

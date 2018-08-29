@@ -2,12 +2,11 @@
 File for support functions.
 """
 
+import os
+
 import arff
 import numpy as np
 import pandas as pd
-import os
-
-from sklearn import preprocessing
 from sklearn.model_selection import StratifiedKFold
 
 
@@ -90,11 +89,11 @@ def __get_fold__(params, dataset_path, n_fold):
             test_index = test_index_
             break
 
-    X_train = X.iloc[train_index]
-    X_test = X.iloc[test_index]
+    X_train = X.loc[train_index]
+    X_test = X.loc[test_index]
 
-    y_train = y.iloc[train_index]
-    y_test = y.iloc[test_index]
+    y_train = y.loc[train_index]
+    y_test = y.loc[test_index]
 
     return X_train, X_test, y_train, y_test
 
@@ -108,10 +107,4 @@ def get_dataset_name(dataset_path):
     :return: the name of the dataset.
     """
 
-    if os.name == 'nt':  # if on windows
-        sep = '\\'
-    else:  # else on linux, mac
-        sep = '/'
-
-    dataset_name = dataset_path.split(sep)[-1].split('.')[-2]
-    return dataset_name
+    return dataset_path.split(os.sep)[-1].split('.')[-2]
