@@ -56,6 +56,8 @@ def static_projection(table, file_out):
     inner_table = table.loc[(table['set_name'] == 'train') & (table['generation'] >= 0)]
     weight_columns = inner_table.columns[18:]
 
+    min_fitness, max_fitness = inner_table['fitness'].min(), inner_table['fitness'].max()
+    
     x_columns = weight_columns[:(len(weight_columns) / 2)]
     y_columns = weight_columns[(len(weight_columns) / 2):]
 
@@ -63,7 +65,10 @@ def static_projection(table, file_out):
     y = np.mean(inner_table[y_columns].values, axis=1)
     c = inner_table['fitness'].values
 
-    plt.hexbin(x, y, C=c, reduce_C_function=np.mean)  # mean of weights
+    plt.xlim(0.7, 1.)
+    plt.ylim(0.7, 1.)
+
+    plt.hexbin(x, y, C=c, reduce_C_function=np.mean, vmin=min_fitness, vmax=max_fitness)  # mean of weights
 
     plt.xlabel(r'Mean of first W/2 weights')
     plt.ylabel(r'Mean of last W/2 weights')
