@@ -241,22 +241,26 @@ class Ensemble(object):
         :param X: A dataset comprised of instances and attributes.
         :return: An array where each position contains the ensemble prediction for that instance.
         """
-        preds = self.get_predictions(X)
+    
+        all_preds = self.get_predictions(X)
+        global_votes = np.empty((len(X),self.n_classes),dtype=np.float32)
+        
+        for i, that_class in enumerate(self.classes):
+            if self.n_classes == 2:
+                classes_ = np.int32(self.logistic_model[0].classes_)
+                proba = self.logistic_model[0].predict_proba(all_preds.T)
+                global_votes[:, classes_] = proba[:, classes_]
+                break
+                
+            else:
+                print(len(self.logistic_model))
+                classes_ = self.logistic_model[i].classes_
+                right_index = np.argmax(classes_)
+                binary_preds = (all_preds == that_class).astype(np.int32)
+                global_votes[:, i] = self.logistic_model[i].predict_proba(binary_preds.T)[:, right_index]
 
-        n_classifiers, n_instances = preds.shape
+            return np.argmax(global_votes,axis=1)
 
-        local_votes = np.empty(self.n_classes, dtype=np.float32)
-        global_votes = np.empty(n_instances, dtype=np.int32)
-
-        for i in range(n_instances):
-            local_votes[:] = 0.
-
-            for j in range(n_classifiers):
-                local_votes[preds[j, i]] += self.voting_weights[j, preds[j, i]]
-
-            global_votes[i] = np.argmax(local_votes)
-
-        return global_votes
 
     def dfd(self, X, y):
         """
