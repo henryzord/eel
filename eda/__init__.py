@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import AdaBoostClassifier
 from data_normalization import DataNormalizer
-
+from sklearn.linear_model import LogisticRegression
 
 class Ensemble(object):
     def __init__(
@@ -84,6 +84,7 @@ class Ensemble(object):
             )
 
         self.y_train = y_train
+        self.classes = sorted(np.unique(self.y_train))
         self.feature_names = self.X_train.columns
 
         self.n_classes = len(np.unique(y_train))
@@ -101,6 +102,8 @@ class Ensemble(object):
         n_instances_train = self.X_train.shape[0]
 
         self.train_preds = np.empty((self.n_classifiers, n_instances_train), dtype=np.int32)
+
+        self.logistic_model = []
 
     @classmethod
     def from_adaboost(cls, X_train, y_train, data_normalizer_class, n_classifiers):
@@ -152,6 +155,8 @@ class Ensemble(object):
         :rtype: Ensemble
         :return: returns self.
         """
+        self.logistic_model = []
+        all_preds = self.get_predictions(self.X_train)
 
         for j in range(self.n_classifiers):
             for c in range(self.n_classes):
@@ -160,7 +165,21 @@ class Ensemble(object):
                     a_min=0., a_max=1.
                 )
 
+        for that_class in self.classes:
+            if self.n_classes == 2:
+                logistic_regression = LogisticRegression().fit(all_preds.T, self.y_train)
+                logistic_regression.coef_ = self.voting_weights.transpose()
+                self.logistic_model += [logistic_regression]
+                break
+
+            else:
+                binary_preds = (all_preds == that_class).astype(np.int32)
+                logistic_regression = LogisticRegression().fit(all_preds.T, self.y_train)
+                logistic_regression.coef_ = self.voting_weights.transpose()
+                self.logistic_model += [logistic_regression]
+
         return self
+
 
     def get_predictions(self, X):
         """
