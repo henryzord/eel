@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import AdaBoostClassifier
 from data_normalization import DataNormalizer
+from sklearn.linear_model import LogisticRegression
 
 
 class Ensemble(object):
@@ -84,6 +85,7 @@ class Ensemble(object):
             )
 
         self.y_train = y_train
+        self.classes = np.unique(y_train)
         self.feature_names = self.X_train.columns
 
         self.n_classes = len(np.unique(y_train))
@@ -101,6 +103,8 @@ class Ensemble(object):
         n_instances_train = self.X_train.shape[0]
 
         self.train_preds = np.empty((self.n_classifiers, n_instances_train), dtype=np.int32)
+
+        self.logistic_model = []
 
     @classmethod
     def from_adaboost(cls, X_train, y_train, data_normalizer_class, n_classifiers):
@@ -153,6 +157,9 @@ class Ensemble(object):
         :return: returns self.
         """
 
+        self.logistic_model = []
+        all_preds = self.get_predictions(self.X_train)
+
         for j in range(self.n_classifiers):
             for c in range(self.n_classes):
                 self.voting_weights[j][c] = np.clip(
@@ -160,7 +167,21 @@ class Ensemble(object):
                     a_min=0., a_max=1.
                 )
 
+        for that_class in self.classes:
+            if self.n_classes == 2:
+                logistic_regression = LogisticRegression().fit(all_preds.T, self.y_train)
+                logistic_regression.coef_ = self.voting_weights.transpose()
+                self.logistic_model += [logistic_regression]
+                break
+
+            else:
+                binary_preds = (all_preds == that_class).astype(np.int32)
+                logistic_regression = LogisticRegression().fit(all_preds.T, self.y_train)
+                logistic_regression.coef_ = self.voting_weights.transpose()
+                self.logistic_model += [logistic_regression]
+
         return self
+
 
     def get_predictions(self, X):
         """
@@ -201,19 +222,26 @@ class Ensemble(object):
             labeled to that class.
         """
 
-        preds = self.get_predictions(X)
+        all_preds = self.get_predictions(X)
+        global_votes = np.empty((len(X), self.n_classes), dtype=np.float32)
 
-        n_classifiers, n_instances = preds.shape
+        for i, that_class in enumerate(self.classes):
+            if self.n_classes == 2:
+                classes_ = np.int32(self.logistic_model[0].classes_)
+                proba = self.logistic_model[0].predict_proba(all_preds.T)
+                global_votes[:, classes_] = proba[:, classes_]
+                break
 
-        global_votes = np.zeros((n_instances, self.n_classes), dtype=np.float32)
-
-        for i in range(n_instances):
-            for j in range(n_classifiers):
-                global_votes[i, preds[j, i]] += self.voting_weights[j, preds[j, i]]
+            else:
+                classes_ = self.logistic_model[i].classes_
+                right_index = np.argmax(classes_)
+                binary_preds = (all_preds == that_class).astype(np.int32)
+                global_votes[:, i] = self.logistic_model[i].predict_proba(binary_preds.T)[:, right_index]
 
         _sum = np.sum(global_votes, axis=1)
 
         return global_votes / _sum[:, None]
+
 
     def predict(self, X):
         """
@@ -222,22 +250,26 @@ class Ensemble(object):
         :param X: A dataset comprised of instances and attributes.
         :return: An array where each position contains the ensemble prediction for that instance.
         """
-        preds = self.get_predictions(X)
 
-        n_classifiers, n_instances = preds.shape
+        all_preds = self.get_predictions(X)
+        global_votes = np.empty((len(X),self.n_classes),dtype=np.float32)
 
-        local_votes = np.empty(self.n_classes, dtype=np.float32)
-        global_votes = np.empty(n_instances, dtype=np.int32)
+        for i, that_class in enumerate(self.classes):
 
-        for i in range(n_instances):
-            local_votes[:] = 0.
+            if self.n_classes == 2:
+                classes_ = np.int32(self.logistic_model[0].classes_)
+                proba = self.logistic_model[0].predict_proba(all_preds.T)
+                global_votes[:, classes_] = proba[:, classes_]
+                break
 
-            for j in range(n_classifiers):
-                local_votes[preds[j, i]] += self.voting_weights[j, preds[j, i]]
+            else:
+                classes_ = self.logistic_model[i].classes_
+                right_index = np.argmax(classes_)
+                binary_preds = (all_preds == that_class).astype(np.int32)
+                global_votes[:, i] = self.logistic_model[i].predict_proba(binary_preds.T)[:, right_index]
 
-            global_votes[i] = np.argmax(local_votes)
+        return np.argmax(global_votes,axis=1)
 
-        return global_votes
 
     def dfd(self, X, y):
         """
