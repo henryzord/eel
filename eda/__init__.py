@@ -176,7 +176,7 @@ class Ensemble(object):
 
             else:
                 binary_preds = (all_preds == that_class).astype(np.int32)
-                logistic_regression = LogisticRegression().fit(all_preds.T, self.y_train)
+                logistic_regression = LogisticRegression().fit(binary_preds.T, self.y_train == that_class)
                 logistic_regression.coef_ = self.voting_weights.transpose()
                 self.logistic_model += [logistic_regression]
 
@@ -268,7 +268,7 @@ class Ensemble(object):
                 binary_preds = (all_preds == that_class).astype(np.int32)
                 global_votes[:, i] = self.logistic_model[i].predict_proba(binary_preds.T)[:, right_index]
 
-        return np.argmax(global_votes,axis=1)
+        return np.argmax(global_votes, axis=1)
 
 
     def dfd(self, X, y):
