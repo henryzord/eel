@@ -5,7 +5,6 @@ import pandas as pd
 from sklearn.ensemble import AdaBoostClassifier
 from data_normalization import DataNormalizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import MinMaxScaler
 
 class Ensemble(object):
     def __init__(
@@ -125,7 +124,7 @@ class Ensemble(object):
         :param n_classifiers: Number of base classifiers to use within AdaBoost.
         :return: an ensemble of base classifiers trained by AdaBoost.
         """
-        _all=X_train
+
         normalizer = data_normalizer_class().fit(X_train.values)
         X_train = pd.DataFrame(data=normalizer.transform(X_train.values), index=X_train.index, columns=X_train.columns)
 
