@@ -83,7 +83,7 @@ def __save__(reporter, generation, A, P, P_fitness, loc, scale):
         pass
 
 
-def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False, reporter=None, verbose=True):
+def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=True, reporter=None, verbose=True):
     """
     Optimize voting weights for an ensemble of base classifiers.
 
@@ -130,16 +130,16 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
     streak = 0
     max_streak = 5
 
-    ensemble_train_acc = accuracy_score(ensemble.y_train, ensemble.predict(ensemble.X_train))
-    dfd = ensemble.dfd(ensemble.X_train, ensemble.y_train)
+   # ensemble_train_acc = accuracy_score(ensemble.y_train, ensemble.predict(ensemble.X_train))
+   # dfd = ensemble.dfd(ensemble.X_train, ensemble.y_train)
 
-    print('generation %02.d: ens val acc: %.4f dfd: %.4f time elapsed: %f' % (
-        -1, ensemble_train_acc, dfd, (dt.now() - t1).total_seconds()
-    ))
+   # print('generation %02.d: ens val acc: %.4f dfd: %.4f time elapsed: %f' % (
+   #     -1, ensemble_train_acc, dfd, (dt.now() - t1).total_seconds()
+   # ))
 
-    __save__(
-        reporter=reporter, generation=-1, A=[0], P=[ensemble], P_fitness=[0], loc=loc, scale=scale
-    )
+   # __save__(
+   #     reporter=reporter, generation=-1, A=[0], P=[ensemble], P_fitness=[0], loc=loc, scale=scale
+    #)
 
     g = 0
     while g < n_generations:
