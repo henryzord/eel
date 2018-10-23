@@ -170,17 +170,19 @@ class Ensemble(object):
                     a_min=0., a_max=1.
                 )
 
-        for that_class in self.classes:
+        for i, that_class in enumerate(self.classes):
             if self.n_classes == 2:
-                logistic_regression = LogisticRegression().fit(all_preds.T, self.y_train)
-                logistic_regression.coef_ = self.voting_weights.transpose()
+                logistic_regression = LogisticRegression()
+                logistic_regression.fit(all_preds.T, self.y_train)
+                logistic_regression.coef_ = self.voting_weights[:, i].reshape(1,self.n_classifiers) 
                 self.logistic_model += [logistic_regression]
                 break
 
             else:
                 binary_preds = (all_preds == that_class).astype(np.int32)
-                logistic_regression = LogisticRegression().fit(binary_preds.T, self.y_train == that_class)
-                logistic_regression.coef_ = self.voting_weights.transpose()
+                logistic_regression = LogisticRegression()
+                logistic_regression.fit(binary_preds.T, self.y_train == that_class)
+                logistic_regression.coef_ = self.voting_weights[:, i].reshape(1,self.n_classifiers)
                 self.logistic_model += [logistic_regression]
 
         return self
