@@ -7,6 +7,7 @@ import random
 from datetime import datetime as dt
 
 import numpy as np
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
 from eda import Ensemble
@@ -105,6 +106,8 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=True, 
     n_classifiers = ensemble.n_classifiers
     n_classes = ensemble.n_classes
 
+    classes = ensemble.classes
+
     # overrides prior seed
     np.random.seed(None)
     random.seed(None)
@@ -117,6 +120,15 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=True, 
         loc[:] = ensemble.voting_weights[:]
     else:
         loc = np.random.normal(loc=1., scale=scale, size=(n_classifiers, n_classes)).astype(dtype=np.float32)
+
+    all_preds = ensemble.get_predictions(ensemble.X_train)
+    for i, some_class in enumerate(classes):
+        if n_classes == 2:
+            loc[:, i] = LogisticRegression().fit(all_preds.T, ensemble.y_train).coef_
+            break
+        else:
+            binary_preds = (all_preds == some_class).astype(np.int32)
+            loc[:, i] = LogisticRegression().fit(binary_preds.T, ensemble.y_train == some_class).coef_
 
     P = []
     for i in range(n_individuals):
