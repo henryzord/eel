@@ -47,7 +47,7 @@ def gm_projection(table, file_out):
 
 def main(path_read, path_out):
     files = [xx for xx in pathlib2.Path(path_read).iterdir() if (xx.is_file() and 'gm.csv' in str(xx))]
-    files = map(lambda x: str(x).split('/')[-1].split('.')[0].split('-'), files)
+    files = list(map(lambda x: str(x).split('/')[-1].split('.')[0].split('-'), files))
     summary = pd.DataFrame(files, columns=['dataset_name', 'n_fold', 'n_run', 'pop'])
     summary['n_fold'] = summary['n_fold'].astype(np.int32)
     summary['n_run'] = summary['n_run'].astype(np.int32)
@@ -65,14 +65,14 @@ def main(path_read, path_out):
         partial = summary.loc[summary['dataset_name'] == dataset_name]
         if len(partial.index) != (n_folds * n_runs):
             global_counter += (n_folds * n_runs)
-            print '%04.d/%04.d steps done [skipping %s]' % (
+            print ('%04.d/%04.d steps done [skipping %s]' % (
                 global_counter, total_steps, dataset_name
-            )
+            ))
             continue  # skips
 
         numeric_columns = None
-        for n_fold in xrange(n_folds):
-            for n_run in xrange(n_runs):
+        for n_fold in range(n_folds):
+            for n_run in range(n_runs):
                 current = pd.read_csv(
                     os.path.join(
                         path_read,
@@ -93,15 +93,15 @@ def main(path_read, path_out):
                 )
 
                 global_counter += 1
-                print '%04.d/%04.d steps done' % (global_counter, total_steps)
+                print ('%04.d/%04.d steps done' % (global_counter, total_steps))
 
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
-        print 'usage:'
-        print '\tpython gm_projection.py <path_read> <path_out>'
-        print 'example:'
-        print '\tpython gm_projection.py \"/home/user/metadata\" \"home/user/result.csv\"'
+        print ('usage:')
+        print ('\tpython gm_projection.py <path_read> <path_out>')
+        print ('example:')
+        print ('\tpython gm_projection.py \"/home/user/metadata\" \"home/user/result.csv\"')
 
     __path_read, __path_out = sys.argv[1:]
 
