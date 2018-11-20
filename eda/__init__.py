@@ -6,7 +6,6 @@ from sklearn.ensemble import AdaBoostClassifier
 from data_normalization import DataNormalizer
 from sklearn.linear_model import LogisticRegression
 
-
 class Ensemble(object):
     def __init__(
             self,
@@ -77,7 +76,11 @@ class Ensemble(object):
         elif isinstance(data_normalizer_class, DataNormalizer):
             self.normalizer = data_normalizer_class
             self.X_train = X_train
-            if not np.all(self.X_train.max(axis=0)):
+
+            maxes = self.X_train.max(axis=0).astype(int)
+            mins = self.X_train.min(axis=0).astype(int)
+
+            if np.any(maxes > 1) or np.any(mins < 0):
                 raise ValueError('data_normalizer_class is instantiated, but X_train is not normalized!')
         else:
             raise TypeError(
@@ -167,17 +170,19 @@ class Ensemble(object):
                     a_min=0., a_max=1.
                 )
 
-        for that_class in self.classes:
+        for i, that_class in enumerate(self.classes):
             if self.n_classes == 2:
-                logistic_regression = LogisticRegression().fit(all_preds.T, self.y_train)
-                logistic_regression.coef_ = self.voting_weights.transpose()
+                logistic_regression = LogisticRegression()
+                logistic_regression.fit(all_preds.T, self.y_train)
+                logistic_regression.coef_ = self.voting_weights[:, i].reshape(1,self.n_classifiers) 
                 self.logistic_model += [logistic_regression]
                 break
 
             else:
                 binary_preds = (all_preds == that_class).astype(np.int32)
-                logistic_regression = LogisticRegression().fit(all_preds.T, self.y_train)
-                logistic_regression.coef_ = self.voting_weights.transpose()
+                logistic_regression = LogisticRegression()
+                logistic_regression.fit(binary_preds.T, self.y_train == that_class)
+                logistic_regression.coef_ = self.voting_weights[:, i].reshape(1,self.n_classifiers)
                 self.logistic_model += [logistic_regression]
 
         return self
@@ -268,7 +273,7 @@ class Ensemble(object):
                 binary_preds = (all_preds == that_class).astype(np.int32)
                 global_votes[:, i] = self.logistic_model[i].predict_proba(binary_preds.T)[:, right_index]
 
-        return np.argmax(global_votes,axis=1)
+        return np.argmax(global_votes, axis=1)
 
 
     def dfd(self, X, y):
