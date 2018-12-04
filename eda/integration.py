@@ -83,7 +83,7 @@ def __save__(reporter, generation, A, P, P_fitness, loc, scale):
         pass
 
 
-def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False, reporter=None, verbose=True):
+def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=True, reporter=None, verbose=True):
     """
     Optimize voting weights for an ensemble of base classifiers.
 
@@ -103,7 +103,6 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
     :return: The same ensemble, with optimized voting weights.
     """
     n_classifiers = ensemble.n_classifiers
-    n_classes = ensemble.n_classes
 
     # overrides prior seed
     np.random.seed(None)
@@ -113,10 +112,10 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
     decay = scale / float(n_generations)
 
     if use_weights:
-        loc = np.empty((n_classifiers, n_classes), dtype=np.float32)
+        loc = np.empty((n_classifiers,1), dtype=np.float32)
         loc[:] = ensemble.voting_weights[:]
     else:
-        loc = np.random.normal(loc=1., scale=scale, size=(n_classifiers, n_classes)).astype(dtype=np.float32)
+        loc = np.random.normal(loc=1., scale=scale, size=(n_classifiers,1)).astype(dtype=np.float32)
 
     P = []
     for i in range(n_individuals):
@@ -145,7 +144,8 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=False,
     while g < n_generations:
         for i in range(n_individuals):
             if not A[i]:
-                P[i] = P[i].resample_voting_weights(loc=loc, scale=scale)
+                teste =  P[i].resample_voting_weights(loc=loc, scale=scale)
+                P[i] = teste
 
                 train_probs = P[i].predict_proba(P[i].X_train)
                 argtrain = np.argmax(train_probs, axis=1)

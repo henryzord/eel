@@ -76,7 +76,9 @@ class Ensemble(object):
         elif isinstance(data_normalizer_class, DataNormalizer):
             self.normalizer = data_normalizer_class
             self.X_train = X_train
-            if not np.all(self.X_train.max(axis=0)):
+            maxes = self.X_train.max(axis=0).astype(int)
+            mins = self.X_train.min(axis=0).astype(int)
+            if np.any(maxes > 1) or np.any(mins < 0):
                 raise ValueError('data_normalizer_class is instantiated, but X_train is not normalized!')
         else:
             raise TypeError(
@@ -124,9 +126,8 @@ class Ensemble(object):
         rf = AdaBoostClassifier(n_estimators=n_classifiers, algorithm='SAMME')  # type: AdaBoostClassifier
         rf = rf.fit(X_train, y_train)  # type: AdaBoostClassifier
 
-        n_classes = rf.n_classes_
 
-        voting_weights = np.empty((n_classifiers, n_classes), dtype=np.float32)
+        voting_weights = np.empty((n_classifiers, 1), dtype=np.float32)
         voting_weights[:] = rf.estimator_weights_[:, np.newaxis]
 
         ensemble = Ensemble(
@@ -155,8 +156,8 @@ class Ensemble(object):
 
         for j in range(self.n_classifiers):
             for c in range(self.n_classes):
-                self.voting_weights[j][c] = np.clip(
-                    np.random.normal(loc=loc[j][c], scale=scale),
+                self.voting_weights[j] = np.clip(
+                    np.random.normal(loc=loc[j], scale=scale),
                     a_min=0., a_max=1.
                 )
 
@@ -209,7 +210,7 @@ class Ensemble(object):
 
         for i in range(n_instances):
             for j in range(n_classifiers):
-                global_votes[i, preds[j, i]] += self.voting_weights[j, preds[j, i]]
+                global_votes[i, preds[j, i]] += self.voting_weights[j]
 
         _sum = np.sum(global_votes, axis=1)
 
@@ -233,7 +234,7 @@ class Ensemble(object):
             local_votes[:] = 0.
 
             for j in range(n_classifiers):
-                local_votes[preds[j, i]] += self.voting_weights[j, preds[j, i]]
+                local_votes[preds[j, i]] += self.voting_weights[j]
 
             global_votes[i] = np.argmax(local_votes)
 
