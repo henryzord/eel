@@ -155,11 +155,10 @@ class Ensemble(object):
         """
 
         for j in range(self.n_classifiers):
-            for c in range(self.n_classes):
-                self.voting_weights[j] = np.clip(
-                    np.random.normal(loc=loc[j], scale=scale),
-                    a_min=0., a_max=1.
-                )
+            self.voting_weights[j] = np.clip(
+                np.random.normal(loc=loc[j], scale=scale),
+                a_min=0., a_max=1.
+            )
 
         return self
 
