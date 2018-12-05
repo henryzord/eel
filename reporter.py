@@ -34,7 +34,7 @@ class BaseReporter(object):
     ):
         self.Xs = Xs
         self.ys = ys
-        self.set_sizes = map(len, self.ys)
+        self.set_sizes = list(map(len, self.ys))
         self.set_names = set_names
         self.dataset_name = dataset_name
 
