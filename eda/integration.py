@@ -111,11 +111,10 @@ def integrate(ensemble, n_individuals=100, n_generations=100, use_weights=True, 
     scale = 0.25
     decay = scale / float(n_generations)
 
-    if use_weights:
-        loc = np.empty((n_classifiers,1), dtype=np.float32)
-        loc[:] = ensemble.voting_weights[:]
-    else:
-        loc = np.random.normal(loc=1., scale=scale, size=(n_classifiers,1)).astype(dtype=np.float32)
+
+    loc = np.empty((n_classifiers,1), dtype=np.float32)
+    loc[:] = ensemble.voting_weights[:]
+
 
     P = []
     for i in range(n_individuals):
